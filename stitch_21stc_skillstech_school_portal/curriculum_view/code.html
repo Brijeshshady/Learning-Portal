@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Curriculum - EduTech AI</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#ffb786",
+                        "on-secondary-fixed": "#1b1b20",
+                        "on-error": "#690005",
+                        "on-primary": "#002e6a",
+                        "surface": "#10131a",
+                        "surface-tint": "#adc6ff",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "surface-dim": "#10131a",
+                        "primary": "#adc6ff",
+                        "tertiary-container": "#df7412",
+                        "on-secondary-fixed-variant": "#47464c",
+                        "secondary-fixed-dim": "#c8c5cd",
+                        "secondary-fixed": "#e4e1e9",
+                        "inverse-primary": "#005ac2",
+                        "on-background": "#e1e2ec",
+                        "on-surface-variant": "#c2c6d6",
+                        "surface-container-lowest": "#0b0e15",
+                        "surface-container-highest": "#32353c",
+                        "surface-variant": "#32353c",
+                        "on-tertiary-container": "#461f00",
+                        "inverse-on-surface": "#2e3038",
+                        "primary-fixed-dim": "#adc6ff",
+                        "secondary": "#c8c5cd",
+                        "on-secondary-container": "#bab7be",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container": "#1d2027",
+                        "on-surface": "#e1e2ec",
+                        "surface-container-low": "#191b23",
+                        "primary-fixed": "#d8e2ff",
+                        "outline": "#8c909f",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "secondary-container": "#49484e",
+                        "outline-variant": "#424754",
+                        "on-secondary": "#303036",
+                        "surface-container-high": "#272a31",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "on-tertiary-fixed": "#311400",
+                        "tertiary-fixed": "#ffdcc6",
+                        "on-primary-container": "#00285d",
+                        "primary-container": "#4d8eff",
+                        "surface-bright": "#363941",
+                        "on-primary-fixed": "#001a42",
+                        "background": "#10131a",
+                        "error": "#ffb4ab",
+                        "on-tertiary": "#502400",
+                        "inverse-surface": "#e1e2ec"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "1rem",
+                        "xl": "3rem",
+                        "md": "1.5rem",
+                        "unit": "4px",
+                        "xs": "0.5rem",
+                        "margin": "32px",
+                        "gutter": "24px",
+                        "lg": "2rem"
+                    },
+                    "fontFamily": {
+                        "h3": ["Space Grotesk"],
+                        "h2": ["Space Grotesk"],
+                        "body-lg": ["Inter"],
+                        "h1": ["Space Grotesk"],
+                        "label-caps": ["Inter"],
+                        "body-md": ["Inter"],
+                        "stats": ["Space Grotesk"]
+                    },
+                    "fontSize": {
+                        "h3": ["24px", { "lineHeight": "1.3", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "h2": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "h1": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "stats": ["14px", { "lineHeight": "1", "letterSpacing": "0", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background h-screen flex overflow-hidden antialiased">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-slate-950/80 backdrop-blur-md h-screen w-64 border-r border-white/10 shadow-none flex-col py-6 px-4 z-40 shrink-0">
+<!-- Brand Identity -->
+<div class="flex items-center gap-xs px-2 mb-lg">
+<div class="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-size: 20px;">school</span>
+</div>
+<div>
+<h1 class="text-xl font-black text-white tracking-tighter">EduTech AI</h1>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 flex flex-col gap-unit">
+<a class="flex items-center gap-sm px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">dashboard</span>
+<span class="font-['Space_Grotesk'] text-sm tracking-wide">Dashboard</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-sm px-3 py-2.5 rounded-lg text-blue-500 font-bold border-r-2 border-blue-500 bg-blue-500/5 transition-all duration-200 Active: scale-95 duration-150" href="#">
+<span class="material-symbols-outlined icon-fill">menu_book</span>
+<span class="font-['Space_Grotesk'] text-sm tracking-wide">Curriculum</span>
+</a>
+<a class="flex items-center gap-sm px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">smart_toy</span>
+<span class="font-['Space_Grotesk'] text-sm tracking-wide">AI Lab</span>
+</a>
+<a class="flex items-center gap-sm px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all duration-200 group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">account_tree</span>
+<span class="font-['Space_Grotesk'] text-sm tracking-wide">Projects</span>
+</a>
+<a class="flex items-center gap-sm px-3 py-2.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all duration-200 group mt-auto mb-xs" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">person</span>
+<span class="font-['Space_Grotesk'] text-sm tracking-wide">Profile</span>
+</a>
+</div>
+<!-- CTA / User Info Area -->
+<div class="pt-sm border-t border-white/10 mt-xs">
+<button class="w-full flex items-center justify-center gap-xs bg-primary text-on-primary font-stats text-stats py-2 rounded-lg hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Project
+            </button>
+</div>
+</nav>
+<!-- Main Content Container -->
+<main class="flex-1 flex flex-col min-w-0 h-full relative">
+<!-- TopNavBar -->
+<header class="bg-slate-950/40 backdrop-blur-xl w-full h-16 border-b border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex items-center justify-between px-8 sticky top-0 z-50 shrink-0">
+<!-- Mobile Menu Trigger (hidden on desktop) -->
+<button class="md:hidden text-slate-400 hover:text-blue-400 cursor-pointer transition-all ease-in-out">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<!-- Search (on_left as per JSON) -->
+<div class="flex-1 flex items-center max-w-md hidden md:flex">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant text-[20px]">search</span>
+<input class="w-full bg-[#050507] border border-white/10 rounded-full py-1.5 pl-10 pr-4 text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-outline-variant" placeholder="Search curriculum..." type="text"/>
+</div>
+</div>
+<!-- Brand (Mobile Fallback) -->
+<div class="md:hidden text-lg font-bold text-white font-['Space_Grotesk'] antialiased">
+                EduTech AI
+            </div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-sm">
+<button class="text-slate-400 hover:text-blue-400 cursor-pointer transition-all ease-in-out relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full"></span>
+</button>
+<button class="text-slate-400 hover:text-blue-400 cursor-pointer transition-all ease-in-out">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-white/10 ml-xs">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="close up portrait of a male professional learner with neutral expression, soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyCYHWiPaayv0MOFHhOEGwZF1dWVW_eU_irJtvgcsxc44KlOB5HwcYc9XFWmoWFg4tcF_gsvjTim5uFYKW4O9cRnxkSXgY1vgbCX-n7CocciF7MM1xSYEzEklzY6ebdXsZNGv2RA8AWwFIAndNjg7Oj0feu9fvzKD7Kz4iSFkNMRCIeY4A2Yab4B90jvMqEKU9FIZwmoZF20zHT-e2L81w7YEZG09hcmKrUQCPMkiTy36x78I-xn6ET67b88I_x9RGYxderzbVG8E"/>
+</div>
+</div>
+</header>
+<!-- Page Canvas -->
+<div class="flex-1 overflow-y-auto p-margin pb-xl">
+<div class="max-w-[1440px] mx-auto w-full">
+<!-- Page Header & Filters -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md mb-lg">
+<div>
+<h2 class="font-h2 text-h2 text-on-surface mb-unit">Curriculum</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage and review your structured learning paths.</p>
+</div>
+<!-- Filters -->
+<div class="flex flex-wrap items-center gap-xs">
+<div class="flex items-center bg-[#050507] border border-white/10 rounded-lg p-1">
+<span class="px-3 py-1 font-stats text-stats text-on-surface-variant">Grade:</span>
+<select class="bg-transparent border-none text-on-surface font-body-md text-body-md focus:ring-0 cursor-pointer py-1 pl-2 pr-8 appearance-none">
+<option>6-9</option>
+<option>10-12</option>
+</select>
+<span class="material-symbols-outlined text-outline-variant pointer-events-none -ml-6 text-[18px]">expand_more</span>
+</div>
+<div class="flex items-center bg-[#050507] border border-white/10 rounded-lg p-1">
+<span class="px-3 py-1 font-stats text-stats text-on-surface-variant">Type:</span>
+<select class="bg-transparent border-none text-on-surface font-body-md text-body-md focus:ring-0 cursor-pointer py-1 pl-2 pr-8 appearance-none">
+<option>All</option>
+<option>Theory</option>
+<option>Practical</option>
+</select>
+<span class="material-symbols-outlined text-outline-variant pointer-events-none -ml-6 text-[18px]">expand_more</span>
+</div>
+<div class="flex items-center bg-[#050507] border border-white/10 rounded-lg p-1">
+<span class="px-3 py-1 font-stats text-stats text-on-surface-variant">Topic:</span>
+<select class="bg-transparent border-none text-on-surface font-body-md text-body-md focus:ring-0 cursor-pointer py-1 pl-2 pr-8 appearance-none">
+<option>All</option>
+<option>AI</option>
+<option>Python</option>
+<option>IoT</option>
+</select>
+<span class="material-symbols-outlined text-outline-variant pointer-events-none -ml-6 text-[18px]">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Bento Grid Layout for Curriculum -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
+<!-- Left Column: Lesson List (5 cols) -->
+<div class="lg:col-span-5 flex flex-col gap-unit relative">
+<!-- Course Timeline Track -->
+<div class="absolute left-[23px] top-4 bottom-4 w-[2px] bg-white/5 z-0"></div>
+<!-- Card 1: Active State -->
+<button class="relative z-10 w-full text-left bg-surface/40 backdrop-blur-[20px] border border-primary/30 rounded-xl p-md flex gap-sm items-start shadow-[0_8px_32px_rgba(59,130,246,0.15)] transition-all transform hover:-translate-y-1">
+<div class="w-12 h-12 shrink-0 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mt-1 relative">
+<div class="absolute inset-0 bg-primary/20 rounded-full blur-md"></div>
+<span class="material-symbols-outlined text-primary icon-fill relative z-10">code</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-unit">
+<span class="font-label-caps text-label-caps text-primary tracking-widest uppercase">Week 6</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-tertiary-container/10 border border-tertiary/20">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span class="font-stats text-[10px] text-tertiary">Practical</span>
+</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface mb-1">First Python Program</h3>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2 text-sm">Introduction to syntax, variables, and basic I/O operations in a sandboxed environment.</p>
+</div>
+</button>
+<!-- Card 2: Inactive State (Theory) -->
+<button class="relative z-10 w-full text-left bg-surface/20 backdrop-blur-[20px] border border-white/10 rounded-xl p-md flex gap-sm items-start hover:bg-surface/30 transition-all opacity-80 hover:opacity-100">
+<div class="w-12 h-12 shrink-0 rounded-full bg-surface-bright/30 border border-white/10 flex items-center justify-center mt-1">
+<span class="material-symbols-outlined text-outline">menu_book</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-unit">
+<span class="font-label-caps text-label-caps text-outline tracking-widest uppercase">Week 14</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary-container/5 border border-primary/10">
+<span class="w-1.5 h-1.5 rounded-full bg-primary opacity-70"></span>
+<span class="font-stats text-[10px] text-primary/70">Theory</span>
+</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface mb-1">Conditional Logic</h3>
+<p class="font-body-md text-body-md text-on-surface-variant line-clamp-2 text-sm">Understanding control flow using if, elif, and else statements to build decision-making algorithms.</p>
+</div>
+</button>
+<!-- Card 3: Inactive State (Completed) -->
+<button class="relative z-10 w-full text-left bg-surface/10 backdrop-blur-[20px] border border-white/5 rounded-xl p-md flex gap-sm items-start hover:bg-surface/20 transition-all opacity-60">
+<div class="w-12 h-12 shrink-0 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mt-1">
+<span class="material-symbols-outlined text-green-500">check_circle</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between mb-unit">
+<span class="font-label-caps text-label-caps text-outline tracking-widest uppercase line-through decoration-white/20">Week 5</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span class="font-stats text-[10px] text-outline">Completed</span>
+</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface mb-1 line-through decoration-white/20">Intro to Algorithms</h3>
+</div>
+</button>
+</div>
+<!-- Right Column: Expandable Detail View (7 cols) -->
+<div class="lg:col-span-7 h-full">
+<div class="bg-surface/40 backdrop-blur-[40px] border border-white/10 rounded-2xl h-full flex flex-col overflow-hidden sticky top-gutter">
+<!-- Detail Header Image/Graphic Area -->
+<div class="h-48 bg-[#050507] relative border-b border-white/10 overflow-hidden">
+<!-- Abstract decorative element for high-end feel -->
+<div class="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent"></div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent blur-3xl"></div>
+<div class="absolute bottom-md left-md right-md flex items-end justify-between">
+<div>
+<span class="font-label-caps text-label-caps text-primary tracking-widest uppercase mb-2 block">Python • Grade 6-9</span>
+<h2 class="font-h1 text-h1 text-white leading-tight">First Python Program</h2>
+</div>
+<div class="w-16 h-16 rounded-2xl bg-surface/80 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-tertiary text-3xl">terminal</span>
+</div>
+</div>
+</div>
+<!-- Detail Content -->
+<div class="p-lg flex-1 overflow-y-auto flex flex-col gap-lg">
+<!-- Metadata Row -->
+<div class="flex flex-wrap items-center gap-md pb-md border-b border-white/5">
+<div class="flex items-center gap-xs text-on-surface-variant font-stats text-stats">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>45 Mins</span>
+</div>
+<div class="flex items-center gap-xs text-on-surface-variant font-stats text-stats">
+<span class="material-symbols-outlined text-[18px]">star</span>
+<span>Beginner</span>
+</div>
+<div class="flex items-center gap-xs text-on-surface-variant font-stats text-stats">
+<span class="material-symbols-outlined text-[18px]">group_work</span>
+<span>Individual</span>
+</div>
+</div>
+<!-- Description -->
+<div>
+<h4 class="font-h3 text-[18px] text-on-surface mb-xs flex items-center gap-xs">
+<span class="material-symbols-outlined text-outline-variant text-[20px]">info</span>
+                                        Description
+                                    </h4>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                                        This foundational lesson introduces students to the Python programming environment. They will learn how to write a simple script that outputs text to the console, understand the concept of strings, and interact with basic user input to create dynamic responses.
+                                    </p>
+</div>
+<!-- Learning Outcomes -->
+<div>
+<h4 class="font-h3 text-[18px] text-on-surface mb-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-outline-variant text-[20px]">flag</span>
+                                        Learning Outcomes
+                                    </h4>
+<ul class="space-y-3">
+<li class="flex items-start gap-sm">
+<div class="w-5 h-5 rounded-full border border-primary/30 flex items-center justify-center shrink-0 mt-0.5">
+<div class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(173,198,255,0.8)]"></div>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant">Understand the print() function and string formatting.</span>
+</li>
+<li class="flex items-start gap-sm">
+<div class="w-5 h-5 rounded-full border border-primary/30 flex items-center justify-center shrink-0 mt-0.5">
+<div class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(173,198,255,0.8)]"></div>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant">Declare and assign simple variables.</span>
+</li>
+</ul>
+</div>
+<!-- Task Box -->
+<div class="mt-auto pt-md">
+<div class="bg-surface-container-highest/30 border border-white/5 rounded-xl p-md relative overflow-hidden">
+<!-- Subtle corner accent -->
+<div class="absolute top-0 right-0 w-16 h-16 bg-tertiary/5 blur-2xl rounded-full"></div>
+<h4 class="font-h3 text-[18px] text-tertiary mb-xs flex items-center gap-xs">
+<span class="material-symbols-outlined text-[20px]">assignment</span>
+                                            Practical Task
+                                        </h4>
+<p class="font-body-md text-body-md text-on-surface-variant mb-md">
+                                            Build a "Greeting Bot" script that asks for the user's name and favorite color, then outputs a personalized message combining both inputs.
+                                        </p>
+<div class="flex items-center gap-sm">
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded-lg font-stats text-stats hover:opacity-90 transition-opacity flex items-center gap-xs shadow-[0_0_15px_rgba(173,198,255,0.2)]">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+                                                Launch Workspace
+                                            </button>
+<button class="px-6 py-2.5 rounded-lg font-stats text-stats text-on-surface border border-white/10 hover:bg-white/5 transition-colors">
+                                                View Materials
+                                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

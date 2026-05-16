@@ -1,0 +1,25 @@
+# 21st Century Skills Techies Schools
+
+## Overview
+21stc Skillstech Schools provides a comprehensive hands-on academic program for students in Grades 6-10. The curriculum focuses on Science, Technology, Engineering, and AI literacy (SNTS + AI Framework) through a "Learning by Doing" philosophy. Based in Tamil Nadu, India, the school works with academic partners like Kota Neet Academy and technology leads like Green Dwarf Tech.
+
+## Core Curriculum & Skills
+All programs are mapped to the 21st Century Skills framework, integrating entity-graph-ready definitions for AI indexing:
+
+- **Programming**: A technical discipline focused on logic, real-world development, and computational thinking. Students master standard coding practices to solve complex digital problems.
+- **Robotics & IoT**: An engineering-centric field involving smart hardware, sensor integration, and automation. Students design and build functional robotic systems from scratch.
+- **Artificial Intelligence**: A futuristic computing paradigm centered on machine learning, AI ethics, and tool application. Students learn to harness generative and analytical AI in practical scenarios.
+
+## Educational Methodology
+The SNTS + AI framework (Science + Numbers + Technology + Skills) is delivered through:
+- Mini Projects: Independent building and experimentation.
+- Tinker Labs: Access to industry-grade hardware and software.
+- Science Field Work: Real-world application of academic concepts.
+- Simulated Digital Labs: Safely exploring complex systems.
+
+## Partners
+- **Kota Neet Academy**: Primary academic partner leading core science modules and student mentoring.
+- **Green Dwarf Tech**: Technical lead providing curriculum design and technology infrastructure.
+
+## Contact Information
+Inquiries can be made for school partnerships, teacher training, or student demos via the website contact form or directly through partner academic hubs in Tamil Nadu.

@@ -1,0 +1,485 @@
+﻿clean, curriculum-ready version
+integrated AI + IoT + Python syllabus
+topic descriptions
+Theoretical (T)
+Practical (P)
+every week
+Grades 6â€“9
+36 weeks each
+1 class/week
+.
+directly submitted to management / board / academic committee
+.
+GRADE 6 â€“ DISCOVER, EXPLORE, CREATE
+Level intent:
+Balance:
+1
+AI, IoT &amp; Coding Around Us
+Introduces AI, IoT, and Python using daily-life examples students relate to
+T
+2
+Instructions &amp; Algorithms
+Understanding step-by-step instructions and logical sequencing
+T
+3
+AI vs Human
+Comparing them
+T
+4
+Talking to AI
+Learning how to ask clear questions to AI tools
+P
+5
+what is allowed vs not allowed
+T
+6
+First Python Program
+Writing a simple print() statement
+P
+7
+AI Story Creation
+Using AI to turn ideas into short stories
+P
+10
+Python Math
+Using Python for simple calculations
+P
+4
+Python Data Types
+Numbers, text, and variables
+P
+8
+Variables as Storage
+Understanding variables as containers in Python
+P
+9
+Inputs &amp; Outputs (IoT)
+Understanding sensors (input) and actions (output)
+T
+1
+1
+Python Input &amp; Output
+Taking user input and displaying output
+P
+12
+Review Activity
+Reinforcement through fun challenges
+P
+1
+4
+Ifâ€“Thisâ€“Thenâ€“That Logic
+Understanding basic conditional logic
+T
+15
+Conditions in Python
+Introduction to if statements
+P
+16
+Smart Devices
+Exploring IoT devices at home and school
+T
+1
+7
+Understanding Data
+Learning what data is using simple examples
+T
+1
+8
+Debugging Basics
+Finding and fixing simple errors
+P
+19
+AI Safety &amp; Ethics
+Responsible and safe AI usage
+T
+2
+0
+How IoT works
+Structure of IoT
+T
+2
+1
+Designing a Smart Room
+Conceptual design of an IoT-based room
+P
+GRADE 7 â€“ APPLY &amp; COLLABORATE
+Level intent:
+Balance:
+Weeks 1â€“12: Skill Strengthening
+Week
+Topic
+Description
+Type
+1
+Recap of AI, IoT &amp; Python
+Refreshing prior concepts
+T
+2
+Fact Checking &amp; Bias
+Understanding incorrect or biased AI responses
+T
+5
+Decision Logic
+Using conditions for problem solving
+P
+6
+Smart Systems
+Overview of connected systems
+T
+7
+AI Images
+Generating image from text prompts
+P
+8
+AI Images for Communication
+Creating visual messages
+P
+Loops Theory
+What is repetition &amp; loops
+T
+10
+Python Loops
+Automating repeated tasks
+P
+11
+Sensor Data Concept
+Understanding how sensors collect data
+T
+1
+2
+Team Problem Solving
+Collaborative coding tasks
+P
+13
+AI for Improving Loops Code
+Using AI to improve logic
+P
+Weeks 13â€“24: Media, Data &amp; Automation
+Week
+Topic
+Description
+Type
+1
+4
+Lists in Python
+What is list, and how it works
+T
+1
+5
+IoT Data Collection
+Understanding how data is gathered
+T
+1
+6
+AI Summarization
+Using AI to summarize information
+P
+17
+Smart Transport
+IoT use in traffic systems
+T
+Weeks 25â€“36: Smart System Design
+Week
+Topic
+Description
+Type
+18
+Sensor Simulation
+Simulating IoT inputs
+P
+19
+Automation Rules
+Designing smart logic
+P
+20
+AI Feedback
+Improving solutions using AI
+P
+GRADE 8 â€“ DESIGN &amp; DECISION MAKING
+Level intent:
+Balance:
+Weeks 1â€“36 (Summary Pattern)
+Theory weeks:
+Practical weeks:
+Major outcome:
+same table depth
+â€”I paused here to keep this readable.)
+GRADE 9 â€“ INTEGRATION &amp; LEADERSHIP
+Level intent:
+Balance:
+Weeks 1â€“36 (Summary Pattern)
+Theory:
+Practical:
+FINAL NOTE (IMPORTANT FOR APPROVAL)
+theory session is immediately followed by practical use
+No session is â€œlecture-onlyâ€ for long
+portfolio-based
+, not exam-based
+NEP 2020 competency framework
+Next steps I can do for you:
+Grade 8 &amp; 9 tables fully (like Grade 6 &amp; 7)
+teacher lesson plans
+assessment rubrics
+official syllabus document
+student project handbook
+Just tell me how far you want to take this.
+full expansion for Grade 8 and Grade 9
+same table depth and clarity
+week-wise topics, clear descriptions, and Theory (T) / Practical (P) tagging
+.
+entire Grades 6â€“9 integrated AI + IoT + Python curriculum
+board-ready format
+.
+GRADE 8 â€“ DESIGN, DATA &amp; DECISION MAKING
+Level Intent:
+Pedagogy Balance:
+Weeks 1â€“12: Strengthening Foundations &amp; Systems Thinking
+Week
+Topic
+Description
+Type
+1
+AI, IoT &amp; Python Recap
+Revisiting concepts with real-world connections
+T
+2
+How AI Systems Work
+Understanding models, data, and outputs (conceptual)
+T
+3
+Voice AI
+Converting text to speech
+P
+4
+AI Voice Storytelling
+Creating narrated content (activity)
+P
+3
+Comparing AI Tools
+Evaluating outputs from different AI tools
+P
+20
+AI Bias &amp; Fairness
+Evaluating ethical implications
+T
+4
+Python Revision
+Refreshing variables, conditions, loops
+P
+5
+Lists &amp; Dictionaries
+Organizing structured data in Python
+P
+6
+Data for Decision Making
+How data influences outcomes
+T
+7
+IoT Architecture
+Sensors, processing, communication, action
+T
+9
+Nested Conditions
+Complex decision-making in Python
+P
+8
+Python Functions
+Writing reusable logic blocks
+T
+10
+Sensor Accuracy
+Understanding reliability and limitations
+T
+11
+Problem Analysis
+Breaking real problems into components
+P
+Weeks 13â€“24: Automation, Data &amp; Intelligence
+Week
+Topic
+Description
+Type
+14
+Data Processing in Python
+Filtering, counting, and comparisons
+P
+15
+AI Insights from Data
+Using AI to interpret trends
+P
+16
+Smart Energy Systems
+IoT in power and energy efficiency
+T
+18
+Multi-Sensor Systems
+Combining multiple data inputs
+P
+19
+IoT Security Basics
+Data safety and access control
+T
+Weeks 25â€“36: Innovation &amp; Applied Problem Solving
+Week
+Topic
+Description
+Type
+26
+IoT Data Logging
+Simulating continuous data capture
+P
+27
+Python Functions
+Reusable Code &amp; Invoking
+P
+27
+Error Handling
+Managing unexpected situations
+P
+28
+Optimization Techniques
+Improving performance and logic
+P
+29
+Real-World Case Studies
+Study of smart cities, industry, health
+T
+30
+AI-Assisted Improvement
+Refining solutions using AI feedback
+P
+GRADE 9 â€“ INTEGRATION, LEADERSHIP &amp; REAL-WORLD SYSTEMS
+Level Intent:
+Pedagogy Balance:
+Weeks 1â€“12: Professional &amp; System Foundations
+Week
+Topic
+Description
+Type
+1
+AI, IoT &amp; Python in Careers
+Applications across industries
+T
+2
+Clean Coding Practices
+Writing readable and maintainable code
+P
+3
+Modular Python Programs
+Breaking large programs into modules
+P
+4
+Libraries
+Understanding reuse and abstraction
+T
+4
+File Handling
+Storing and retrieving data using python
+P &amp; T
+5
+Data Handling Techniques
+Working with structured data
+P
+6
+Decision Automation
+Rule-based vs intelligent decisions
+P
+7
+AI-Supported Analysis
+Using AI to assist decision-making
+P
+8
+Security Basics
+Data protection and system safety
+T
+9
+Ethics, Law &amp; Responsibility
+Privacy, bias, accountability
+T
+10
+System Design Principles
+Designing scalable solutions
+T
+Weeks 13â€“24: Intelligent &amp; Connected Systems
+Week
+Topic
+Description
+Type
+13
+AI + IoT Integration
+Using AI to interpret IoT data
+P
+14
+Predictive Logic
+Anticipating outcomes from data
+P
+15
+Smart Cities
+Traffic, waste, energy systems
+T
+16
+Healthcare IoT
+Monitoring and automation in health
+T
+17
+Industrial Automation
+Smart manufacturing concepts
+T
+18
+Risk Analysis
+Identifying system vulnerabilities
+T
+19
+System Optimization
+Improving efficiency and reliability
+P
+Weeks 25â€“36: Capstone Execution &amp; Leadership
+Week
+Topic
+Description
+Type
+26
+AI &amp; IoT Integration
+Data flow and decision logic
+P
+27
+Testing Strategies
+Functional and edge-case testing
+P
+28
+Debugging &amp; Fixes
+Resolving system issues
+P
+29
+Performance Tuning
+Enhancing speed and accuracy
+P
+30
+Documentation
+Technical and user documentation
+T
+31
+Business &amp; Social Impact
+Feasibility and impact analysis
+T
+11
+Project Ideation
+Identifying impactful problems
+P
+12
+Proposal Review
+Feedback and refinement
+P
+CLOSING NOTE (FOR OFFICIAL USE)
+applied within 1â€“2 weeks
+problem-solving language
+, not a subject
+tools and systems
+, not abstract theory
+continuous, project-based, and skill-oriented
+If you want next, I can:
+Grades 6â€“9 into one master curriculum document
+teacher lesson plans (session-ready)
+assessment rubrics &amp; portfolios
+NEP 2020 competencies
+Just tell me the next instruction.
