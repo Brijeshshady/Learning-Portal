@@ -105,10 +105,9 @@ const DB = {
     } catch { /* fall through */ }
     // Demo fallback
     return [
-      { id: 'USR-004', name: 'Arun Kumar',    role: 'student', grade: 7,  schoolId },
-      { id: 'USR-005', name: 'Priya Selvi',   role: 'student', grade: 8,  schoolId },
-      { id: 'USR-006', name: 'Karthik Raja',  role: 'student', grade: 6,  schoolId },
-      { id: 'USR-003', name: 'Ms. Kavitha',   role: 'teacher', grades: [6, 7, 8], schoolId },
+      { id: 'u1', name: 'Arun Kumar',    role: 'student', grade: 7,  schoolId },
+      { id: 'u2', name: 'Priya Selvi',   role: 'student', grade: 8,  schoolId },
+      { id: 'u4', name: 'Ms. Kavitha',   role: 'teacher', grades: [6, 7, 8], schoolId },
     ];
   },
 

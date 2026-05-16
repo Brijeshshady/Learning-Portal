@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText } from 'lucide-react';
+import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import { getHubData } from '../lib/mapping';
 import useStore from '../hooks/useStore';
-import { addUser, removeUser, updateUser, exportCSV, addNotification, teacherCheckIn, teacherCheckOut } from '../lib/store';
+import { addUser, removeUser, updateUser, exportCSV, addNotification, teacherCheckIn, teacherCheckOut, markAttendance, updateLeaveStatus } from '../lib/store';
 import Modal from '../components/Modal';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -308,6 +308,8 @@ const SchoolAttendanceView = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState('students'); // 'students', 'teachers', 'leaves'
+  const [workMode, setWorkMode] = useState('onsite');
+  const [isLocating, setIsLocating] = useState(false);
 
   const students = users.filter(u => u.role === 'student' && u.schoolId === user?.schoolId);
   const teachers = users.filter(u => u.role === 'teacher' && u.schoolId === user?.schoolId);
@@ -318,6 +320,40 @@ const SchoolAttendanceView = () => {
   const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === new Date().toISOString().split('T')[0]);
   const leaveRequests = leaves.filter(l => l.status === 'pending');
 
+  const handleSelfCheckIn = async () => {
+    if (workMode === 'remote') {
+      teacherCheckIn(user.id, 'remote');
+      return;
+    }
+
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      addNotification({ title: 'Error', body: 'Geolocation not supported', type: 'error' });
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        try {
+          teacherCheckIn(user.id, 'onsite', coords);
+        } catch (err) {
+          if (err.message === 'NOT_IN_HUB_LOCATION') {
+            alert('Not in hub location. Go to the hub to mark attendance.');
+          } else {
+            addNotification({ title: 'Error', body: err.message, type: 'error' });
+          }
+        }
+        setIsLocating(false);
+      },
+      () => {
+        addNotification({ title: 'Error', body: 'Location access required for on-site.', type: 'error' });
+        setIsLocating(false);
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between">
@@ -326,10 +362,32 @@ const SchoolAttendanceView = () => {
           <p className="text-zinc-500 text-sm mt-1">Attendance monitoring for your institution.</p>
         </div>
         <div className="flex items-center gap-4">
+          {!myRecord && (
+            <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+              <button 
+                onClick={() => setWorkMode('onsite')}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${workMode === 'onsite' ? 'bg-emerald-500 text-white' : 'text-zinc-500 hover:text-white'}`}
+              >
+                <MapPin className="w-3 h-3" /> On-Site
+              </button>
+              <button 
+                onClick={() => setWorkMode('remote')}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${workMode === 'remote' ? 'bg-amber-500 text-white' : 'text-zinc-500 hover:text-white'}`}
+              >
+                <Activity className="w-3 h-3" /> Remote
+              </button>
+            </div>
+          )}
           <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-2 px-4 flex items-center gap-4">
-             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Self Check-In: <span className="text-white ml-2">{myRecord?.checkIn || '--:--'}</span></p>
+             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Self Check-In {myRecord && `(${myRecord.mode})`}: <span className="text-white ml-2">{myRecord?.checkIn || '--:--'}</span></p>
              {!myRecord ? (
-                <button onClick={() => teacherCheckIn(user.id)} className="bg-emerald-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600">In</button>
+                <button 
+                  disabled={isLocating}
+                  onClick={handleSelfCheckIn} 
+                  className="bg-emerald-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {isLocating ? '...' : 'In'}
+                </button>
              ) : !myRecord.checkOut ? (
                 <button onClick={() => teacherCheckOut(user.id)} className="bg-amber-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-amber-600">Out</button>
              ) : null}

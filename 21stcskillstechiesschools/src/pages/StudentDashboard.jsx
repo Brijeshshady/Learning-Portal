@@ -9,7 +9,7 @@ import {
 } from '../components/DashboardShell';
 import Modal from '../components/Modal';
 import DB from '../lib/db';
-import { addNotification, applyLeave } from '../lib/store';
+import { addNotification, applyLeave, submitAssignment } from '../lib/store';
 import useStore from '../hooks/useStore';
 
 /* ── Overview ─────────────────────────────────────────────── */
@@ -280,50 +280,65 @@ const AILabView = () => {
 };
 
 /* ── Projects ─────────────────────────────────────────────── */
-const ProjectsView = () => {
-  const [projects, setProjects] = useState([
-    { title: 'Smart Room Controller', week: 3, type: 'IoT', grade: 'A',   borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400', submitted: true },
-    { title: 'AI Chatbot v1',         week: 5, type: 'AI',  grade: 'B+',  borderClass: 'border-primary/20',     textClass: 'text-primary', submitted: true },
-    { title: 'Neural Logic Trainer',  week: 7, type: 'ML',  grade: null,  borderClass: 'border-secondary/20',   textClass: 'text-secondary', submitted: false },
-  ]);
+const ProjectsView = ({ user }) => {
+  const { submissions, grades } = useStore();
 
-  const handleSubmit = (index) => {
-    const updated = [...projects];
-    updated[index].submitted = true;
-    setProjects(updated);
-    addNotification({ title: 'Project Submitted', body: `${updated[index].title} has been submitted for grading!`, type: 'success' });
+  const handleSubmit = (p) => {
+    submitAssignment({
+      studentId: user.id,
+      studentName: user.name,
+      week: p.week,
+      title: p.title,
+      content: `Project contents for ${p.title}`
+    });
+    addNotification({ title: 'Project Submitted', body: `${p.title} has been submitted for grading!`, type: 'success' });
+  };
+
+  const getStatus = (p) => {
+    const sub = submissions.find(s => s.studentId === user.id && s.title === p.title);
+    if (!sub) return 'pending_submission';
+    const grade = grades[sub.id];
+    if (grade) return { status: 'graded', grade };
+    return { status: 'under_review' };
   };
 
   return (
     <div className="space-y-6">
       <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Projects</h2><p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have built.</p></div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((p, index) => (
-          <SectionCard key={p.title} className={`border ${p.borderClass}`}>
-            <div className="flex items-start justify-between mb-3">
-              <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
-              {p.grade ? (
-                <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {p.grade}</span>
-              ) : p.submitted ? (
-                <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">Under Review</span>
+        {[
+          { title: 'Smart Room Controller', week: 3, type: 'IoT', borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400' },
+          { title: 'AI Chatbot v1',         week: 5, type: 'AI',  borderClass: 'border-primary/20',     textClass: 'text-primary' },
+          { title: 'Neural Logic Trainer',  week: 7, type: 'ML',  borderClass: 'border-secondary/20',   textClass: 'text-secondary' },
+        ].map((p) => {
+          const info = getStatus(p);
+          return (
+            <SectionCard key={p.title} className={`border ${p.borderClass}`}>
+              <div className="flex items-start justify-between mb-3">
+                <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
+                {info.status === 'graded' ? (
+                  <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {info.grade}</span>
+                ) : info.status === 'under_review' ? (
+                  <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">Under Review</span>
+                ) : (
+                  <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">In Progress</span>
+                )}
+              </div>
+              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
+              <h3 className="text-base font-black text-white mb-4">{p.title}</h3>
+              
+              {info.status !== 'pending_submission' ? (
+                <button className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}>
+                  <ExternalLink className="w-3.5 h-3.5" /> View Project
+                </button>
               ) : (
-                <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">In Progress</span>
+                <button onClick={() => handleSubmit(p)} className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2`}>
+                  <Award className="w-3.5 h-3.5" /> Submit Project
+                </button>
               )}
-            </div>
-            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
-            <h3 className="text-base font-black text-white mb-4">{p.title}</h3>
-            
-            {p.grade || p.submitted ? (
-              <button className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}>
-                <ExternalLink className="w-3.5 h-3.5" /> View Project
-              </button>
-            ) : (
-              <button onClick={() => handleSubmit(index)} className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2`}>
-                <Award className="w-3.5 h-3.5" /> Submit Project
-              </button>
-            )}
-          </SectionCard>
-        ))}
+            </SectionCard>
+          );
+        })}
       </div>
     </div>
   );
@@ -581,7 +596,7 @@ const StudentDashboard = () => {
   const views = {
     overview: <OverviewView user={user} setView={(v) => setSearchParams({ v })} certificates={certificates} stats={stats} />,
     'ai-lab': <AILabView />,
-    projects: <ProjectsView />,
+    projects: <ProjectsView user={user} />,
     roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} />,
     attendance: <MyAttendanceView user={user} />,
     certificates: <CertificatesView user={user} certificates={certificates} />,

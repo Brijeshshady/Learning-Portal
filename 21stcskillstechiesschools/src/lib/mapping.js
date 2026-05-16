@@ -9,12 +9,14 @@ export const HUB_REGISTRY = {
     location: 'Chennai Hub',
     branding: { primary: '#3b82f6', accent: '#a855f7' },
     stats: { totalStudents: 2845, avgCompletion: '78%' },
+    coords: { lat: 13.0827, lng: 80.2707 }, // Chennai
   },
   'HUB-CBE-02': {
     name: 'Coimbatore Innovation Lab',
     location: 'Coimbatore West',
     branding: { primary: '#10b981', accent: '#3b82f6' },
     stats: { totalStudents: 1240, avgCompletion: '82%' },
+    coords: { lat: 11.0168, lng: 76.9558 }, // Coimbatore
   },
 };
 

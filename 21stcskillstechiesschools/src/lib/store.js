@@ -5,12 +5,28 @@
  * through setter callbacks registered with subscribe().
  */
 
+import { HUB_REGISTRY } from './mapping';
+
+/** ── Distance Calculation (Haversine) ── */
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
 /* ── Initial data ──────────────────────────────────────────────────────── */
 const initialUsers = [
   { id: 'u0', name: 'Super Admin',   email: 'superadmin@21stc.com', password: 'password123', role: 'admin',        schoolId: null,         status: 'active' },
   { id: 'u5', name: 'Hub Manager',   email: 'hubadmin@21stc.com',   password: 'password123', role: 'school-admin', schoolId: 'HUB-CH-01',  status: 'active' },
-  { id: 'u4', name: 'Ms. Kavitha',   email: 'teacher@21stc.com',    password: 'password123', role: 'teacher',      schoolId: 'HUB-CH-01',  status: 'active' },
-  { id: 'u1', name: 'Arun Kumar',    email: 'student@21stc.com',    password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active' },
+  { id: 'u4', name: 'Ms. Kavitha',   email: 'teacher@21stc.com',    password: 'password123', role: 'teacher',      schoolId: 'HUB-CH-01',  status: 'active', grades: [6, 7, 8] },
+  { id: 'u1', name: 'Arun Kumar',    email: 'student@21stc.com',    password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active', grade: 7 },
+  { id: 'u2', name: 'Priya Selvi',   email: 'student2@21stc.com',   password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active', grade: 8 },
 ];
 
 const initialNotifications = [
@@ -55,15 +71,20 @@ const initialAttendance = [
 ];
 
 const initialLeaves = [
-  { id: 'l1', studentId: 'u1', startDate: '2026-05-20', endDate: '2026-05-21', reason: 'Family function', status: 'pending', appliedAt: new Date().toISOString() }
+  { id: 'l1', studentId: 'u1', studentName: 'Arun Kumar', startDate: '2026-05-20', endDate: '2026-05-21', reason: 'Family function', status: 'pending', appliedAt: new Date().toISOString() }
 ];
 
 const initialTeacherAttendance = [];
 
+const initialSubmissions = [
+  { id: 'sub_1', studentId: 'u1', studentName: 'Arun Kumar', week: 6, title: 'Neural Network Basics', submittedAt: '2h ago', status: 'pending', content: 'Neural network training loop implementation.' },
+  { id: 'sub_2', studentId: 'u2', studentName: 'Priya Selvi', week: 6, title: 'Neural Network Basics', submittedAt: 'Yesterday', status: 'graded', content: 'Basic ML models implementation.' },
+];
+
 
 
 /* ── Store state ───────────────────────────────────────────────────────── */
-const STORAGE_KEY = 'learning_portal_state';
+const STORAGE_KEY = 'learning_portal_state_v2';
 
 // Load from localStorage or use initial
 const loadState = () => {
@@ -76,12 +97,14 @@ const loadState = () => {
     attendance: initialAttendance,
     leaves: initialLeaves,
     teacherAttendance: initialTeacherAttendance,
+    submissions: initialSubmissions,
     maintenanceMode: initialMaintenanceMode,
   };
   
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
+      // Merge saved state with defaults so new keys (e.g. submissions) are always present
       const parsed = JSON.parse(saved);
       const merged = { ...defaultState, ...parsed };
       
@@ -98,6 +121,16 @@ const loadState = () => {
         if (idx !== -1) merged.hubs[idx] = { ...merged.hubs[idx], ...demoHub };
         else merged.hubs.unshift(demoHub);
       });
+      
+      // Ensure new keys that didn't exist in old cache are always present
+      if (!merged.submissions || !Array.isArray(merged.submissions)) {
+        merged.submissions = initialSubmissions;
+      }
+      // Ensure all leaves have studentName (backfill from users if missing)
+      merged.leaves = merged.leaves.map(l => ({
+        ...l,
+        studentName: l.studentName || merged.users.find(u => u.id === l.studentId)?.name || 'Student'
+      }));
       
       return merged;
     }
@@ -222,9 +255,25 @@ export const toggleLike = (postId) => {
 
 // ── Grades ──
 export const submitGrade = (submissionId, grade) => {
-  state = { ...state, grades: { ...state.grades, [submissionId]: grade } };
-  addNotification({ title: 'Grade Submitted', body: `Grade ${grade} recorded for submission #${submissionId}.`, type: 'success' });
+  state = { 
+    ...state, 
+    grades: { ...state.grades, [submissionId]: grade },
+    submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'graded' } : s)
+  };
+  addNotification({ title: 'Grade Submitted', body: `Grade ${grade} recorded.`, type: 'success' });
   notify();
+};
+
+export const submitAssignment = (submission) => {
+  const newSub = {
+    id: `sub_${Date.now()}`,
+    submittedAt: 'Just now',
+    status: 'pending',
+    ...submission
+  };
+  state = { ...state, submissions: [newSub, ...state.submissions] };
+  notify();
+  return newSub;
 };
 
 
@@ -315,9 +364,23 @@ export const updateLeaveStatus = (leaveId, status) => {
 };
 
 // ── Teacher Attendance ──
-export const teacherCheckIn = (teacherId) => {
+export const teacherCheckIn = (teacherId, mode = 'onsite', coords = null) => {
   const today = new Date().toISOString().split('T')[0];
   const now = new Date().toLocaleTimeString();
+  
+  // Geofencing for On-Site Mode
+  if (mode === 'onsite') {
+    const user = state.users.find(u => u.id === teacherId);
+    const hub = HUB_REGISTRY[user?.schoolId];
+    
+    if (hub?.coords && coords) {
+      const distance = calculateDistance(coords.lat, coords.lng, hub.coords.lat, hub.coords.lng);
+      if (distance > 0.5) { // > 500 meters
+        throw new Error('NOT_IN_HUB_LOCATION');
+      }
+    }
+  }
+
   const exists = state.teacherAttendance.find(a => a.teacherId === teacherId && a.date === today);
   
   if (!exists) {
@@ -326,11 +389,12 @@ export const teacherCheckIn = (teacherId) => {
       teacherId,
       date: today,
       checkIn: now,
+      mode,
       status: 'present'
     };
     state = { ...state, teacherAttendance: [record, ...state.teacherAttendance] };
     notify();
-    addNotification({ title: 'Check-In Successful', body: `Good morning! You checked in at ${now}.`, type: 'success' });
+    addNotification({ title: 'Check-In Successful', body: `Good morning! You checked in (${mode}) at ${now}.`, type: 'success' });
   }
 };
 

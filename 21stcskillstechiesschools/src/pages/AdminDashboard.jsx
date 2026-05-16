@@ -13,7 +13,7 @@ import {
 } from '../components/DashboardShell';
 import Modal from '../components/Modal';
 import useStore from '../hooks/useStore';
-import { addUser, removeUser, updateUser, addHub, updateHub, removeHub, exportCSV, generateLicenseKey, addNotification, setMaintenanceMode, setHubMaintenance, getState } from '../lib/store';
+import { addUser, removeUser, updateUser, addHub, updateHub, removeHub, exportCSV, generateLicenseKey, addNotification, setMaintenanceMode, setHubMaintenance, getState, markAttendance } from '../lib/store';
 import DB from '../lib/db';
 
 
@@ -531,6 +531,7 @@ const SchoolAttendanceView = () => {
   const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = React.useState('students'); // 'students', 'teachers', 'leaves'
 
+  const students = users.filter(u => u.role === 'student');
   const teachers = users.filter(u => u.role === 'teacher');
   
   const currentRecords = attendance.filter(a => a.date === selectedDate);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -85,19 +85,18 @@ const StudentsView = ({ students }) => {
 const SubmissionsView = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [activeGrade, setActiveGrade] = useState('');
-  const { grades } = useStore();
+  const { submissions, grades } = useStore();
+  const { user } = useAuth();
 
-  const baseSubs = [
-    { id: 1, student: 'Arun Kumar',  week: 6, title: 'Neural Network Basics', submitted: '2h ago' },
-    { id: 2, student: 'Priya Selvi', week: 6, title: 'Neural Network Basics', submitted: 'Yesterday' },
-    { id: 3, student: 'Meena Devi',  week: 6, title: 'Neural Network Basics', submitted: '1h ago' },
-  ];
-
-  // Merge with store grades
-  const subs = baseSubs.map(s => ({
+  // Filter submissions by teacher's school and assigned grades
+  const subs = submissions.filter(s => {
+    // Basic filter: only show submissions from student in the same school
+    // Advanced: could filter by teacher.grades if available
+    return true; // For demo, show all global subs
+  }).map(s => ({
     ...s,
-    grade: grades[s.id] || (s.id === 2 ? 'A' : null),
-    status: grades[s.id] || s.id === 2 ? 'graded' : 'pending'
+    grade: grades[s.id] || null,
+    status: grades[s.id] ? 'graded' : 'pending'
   }));
 
   const handleExport = () => {
@@ -121,9 +120,9 @@ const SubmissionsView = () => {
         {subs.map((s) => (
           <div key={s.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
             <button onClick={() => setExpandedId(expandedId === s.id ? null : s.id)} className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all">
-              <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 font-black text-xs shrink-0">{s.student[0]}</div>
-              <div className="flex-1"><p className="text-sm font-bold text-white">{s.student}</p><p className="text-xs text-zinc-500 font-medium">Week {s.week}: {s.title}</p></div>
-              <span className="text-[9px] text-zinc-600 font-black">{s.submitted}</span>
+              <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 font-black text-xs shrink-0">{s.studentName[0]}</div>
+              <div className="flex-1"><p className="text-sm font-bold text-white">{s.studentName}</p><p className="text-xs text-zinc-500 font-medium">Week {s.week}: {s.title}</p></div>
+              <span className="text-[9px] text-zinc-600 font-black">{s.submittedAt}</span>
               {s.status === 'pending' ? <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest">Pending</span> : <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest">Grade: {s.grade}</span>}
               <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${expandedId === s.id ? 'rotate-180' : ''}`} />
             </button>
@@ -131,7 +130,9 @@ const SubmissionsView = () => {
               {expandedId === s.id && (
                 <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-t border-zinc-800">
                   <div className="p-5 space-y-4">
-                    <div className="bg-zinc-800/60 rounded-xl p-4 text-sm text-zinc-400 min-h-[60px] border border-zinc-700/50">Submission contents loaded from user workspace. Contains Python script for neural network training loop. Code passed all basic syntax checks.</div>
+                    <div className="bg-zinc-800/60 rounded-xl p-4 text-sm text-zinc-400 min-h-[60px] border border-zinc-700/50">
+                      {s.content}
+                    </div>
                     {s.status === 'pending' && (
                       <div className="flex gap-2 flex-wrap items-center">
                         {['A', 'B+', 'B', 'C+', 'C'].map((g) => (
@@ -286,6 +287,8 @@ const CertificatesView = ({ students }) => {
 const AttendanceView = ({ students }) => {
   const { attendance = [], teacherAttendance = [], leaves = [] } = useStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [workMode, setWorkMode] = useState('onsite'); // 'onsite' or 'remote'
+  const [isLocating, setIsLocating] = useState(false);
   const { user } = useAuth();
 
   const handleMark = (studentId, status) => {
@@ -295,6 +298,40 @@ const AttendanceView = ({ students }) => {
   const handleMarkAll = () => {
     students.forEach(s => markAttendance(s.id, selectedDate, 'present', user?.id));
     addNotification({ title: 'Attendance Saved', body: `All students marked present for ${selectedDate}.`, type: 'success' });
+  };
+
+  const handleTeacherCheckIn = async () => {
+    if (workMode === 'remote') {
+      teacherCheckIn(user.id, 'remote');
+      return;
+    }
+
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      addNotification({ title: 'Error', body: 'Geolocation is not supported by your browser', type: 'error' });
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        try {
+          teacherCheckIn(user.id, 'onsite', coords);
+        } catch (err) {
+          if (err.message === 'NOT_IN_HUB_LOCATION') {
+            alert('You are not in the hub\'s location. Please go to the hub to mark attendance.');
+          } else {
+            addNotification({ title: 'Check-In Failed', body: err.message, type: 'error' });
+          }
+        }
+        setIsLocating(false);
+      },
+      (err) => {
+        addNotification({ title: 'Location Error', body: 'Please enable location access to check-in on-site.', type: 'error' });
+        setIsLocating(false);
+      }
+    );
   };
 
   const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === new Date().toISOString().split('T')[0]);
@@ -383,13 +420,37 @@ const AttendanceView = ({ students }) => {
         <div className="space-y-6">
           <SectionCard title="My Attendance">
             <div className="flex flex-col gap-4 mt-2">
+              {!myRecord && (
+                <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                  <button 
+                    onClick={() => setWorkMode('onsite')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${workMode === 'onsite' ? 'bg-blue-500 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" /> On-Site
+                  </button>
+                  <button 
+                    onClick={() => setWorkMode('remote')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${workMode === 'remote' ? 'bg-amber-500 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}
+                  >
+                    <Activity className="w-3.5 h-3.5" /> Remote
+                  </button>
+                </div>
+              )}
               <div className="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Daily Check-In</p>
+                  <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+                    Daily Check-In {myRecord && <span className="text-zinc-400 ml-1">({myRecord.mode})</span>}
+                  </p>
                   <p className="text-lg font-black text-white mt-1">{myRecord?.checkIn || '--:--'}</p>
                 </div>
                 {!myRecord ? (
-                  <button onClick={() => teacherCheckIn(user.id)} className="bg-blue-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">Check In</button>
+                  <button 
+                    disabled={isLocating}
+                    onClick={handleTeacherCheckIn} 
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-wait"
+                  >
+                    {isLocating ? 'Locating...' : 'Check In'}
+                  </button>
                 ) : !myRecord.checkOut ? (
                   <button onClick={() => teacherCheckOut(user.id)} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all">Check Out</button>
                 ) : (
@@ -410,9 +471,9 @@ const AttendanceView = ({ students }) => {
                 pendingLeaves.map(leave => (
                   <div key={leave.id} className="bg-zinc-800/40 border border-zinc-800 p-4 rounded-xl space-y-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-[10px] uppercase">{leave.studentName[0]}</div>
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-[10px] uppercase">{leave.studentName?.[0] ?? '?'}</div>
                       <div>
-                        <p className="text-xs font-black text-white">{leave.studentName}</p>
+                        <p className="text-xs font-black text-white">{leave.studentName ?? 'Unknown Student'}</p>
                         <p className="text-[10px] text-zinc-500 font-bold">{leave.startDate} to {leave.endDate}</p>
                       </div>
                     </div>
