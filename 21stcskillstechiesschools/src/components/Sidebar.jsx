@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Zap,
   Award,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -35,6 +36,7 @@ const MENUS = {
       { name: 'User Registry', view: 'users',     icon: Users },
       { name: 'Hub Registry',  view: 'schools',   icon: Database },
       { name: 'Certificates',  view: 'certificates', icon: Award },
+      { name: 'Attendance',    view: 'attendance',   icon: Calendar },
       { name: 'License Keys',  view: 'activation',icon: Key },
       { name: 'Analytics',     view: 'analytics', icon: Activity },
     ],
@@ -45,6 +47,7 @@ const MENUS = {
     links: [
       { name: 'Institution',  view: 'overview',   icon: ShieldCheck },
       { name: 'Manage Users', view: 'users',      icon: UserCog },
+      { name: 'Attendance',   view: 'attendance', icon: Calendar },
       { name: 'Certificates', view: 'certificates', icon: Award },
       { name: 'Reports',      view: 'analytics',  icon: BarChart2 },
     ],
@@ -55,6 +58,7 @@ const MENUS = {
     links: [
       { name: 'Class Overview',  view: 'overview',     icon: LayoutDashboard },
       { name: 'Student List',    view: 'students',     icon: Users },
+      { name: 'Attendance',      view: 'attendance',   icon: Calendar },
       { name: 'Submissions',     view: 'submissions',  icon: ClipboardList },
       { name: 'Certificates',    view: 'certificates', icon: Award },
       { name: 'Syllabus View',   view: 'curriculum',   icon: BookOpen },
@@ -67,6 +71,7 @@ const MENUS = {
       { name: 'Dashboard',        view: 'overview',  icon: LayoutDashboard },
       { name: 'AI Lab',           view: 'ai-lab',    icon: Bot },
       { name: 'My Projects',      view: 'projects',  icon: Rocket },
+      { name: 'Attendance',       view: 'attendance', icon: Calendar },
       { name: 'Weekly Roadmap',   view: 'roadmap',   icon: Zap },
       { name: 'Certificates',     view: 'certificates', icon: Award },
       { name: 'Support',          view: 'support',   icon: HelpCircle },

@@ -50,6 +50,16 @@ const initialHubs = [
 const initialGrades = {};
 const initialMaintenanceMode = false;
 
+const initialAttendance = [
+  { id: 'a1', studentId: 'u1', date: new Date().toISOString().split('T')[0], status: 'present', markedBy: 'u4' }
+];
+
+const initialLeaves = [
+  { id: 'l1', studentId: 'u1', startDate: '2026-05-20', endDate: '2026-05-21', reason: 'Family function', status: 'pending', appliedAt: new Date().toISOString() }
+];
+
+const initialTeacherAttendance = [];
+
 
 
 /* ── Store state ───────────────────────────────────────────────────────── */
@@ -63,6 +73,9 @@ const loadState = () => {
     posts: initialPosts,
     hubs: initialHubs,
     grades: {},
+    attendance: initialAttendance,
+    leaves: initialLeaves,
+    teacherAttendance: initialTeacherAttendance,
     maintenanceMode: initialMaintenanceMode,
   };
   
@@ -105,6 +118,18 @@ const notify = () => {
     console.error('Failed to save store state', e);
   }
 };
+
+// Sync across tabs in real-time
+window.addEventListener('storage', (e) => {
+  if (e.key === STORAGE_KEY && e.newValue) {
+    try {
+      state = JSON.parse(e.newValue);
+      subscribers.forEach((fn) => fn({ ...state }));
+    } catch (err) {
+      console.error('Failed to sync state across tabs', err);
+    }
+  }
+});
 
 /* ── Public API ────────────────────────────────────────────────────────── */
 export const subscribe = (fn) => {
@@ -222,17 +247,106 @@ export const updateHub = (id, patch) => {
   notify();
 };
 
-export const setHubMaintenance = (hubId, maintenance) => {
-  state = { 
-    ...state, 
-    hubs: state.hubs.map(h => h.id === hubId ? { ...h, maintenance } : h) 
-  };
-  addNotification({ 
-    title: maintenance.active ? 'Hub Maintenance On' : 'Hub Maintenance Off', 
-    body: `Maintenance status updated for hub ${hubId}.`, 
-    type: maintenance.active ? 'warning' : 'success' 
-  });
+export const setHubMaintenance = (hubId, active, until = null, message = '') => {
+  const hub = state.hubs.find(h => h.id === hubId);
+  if (hub) {
+    state = {
+      ...state,
+      hubs: state.hubs.map(h => 
+        h.id === hubId 
+          ? { ...h, maintenance: { active, until, message } } 
+          : h
+      )
+    };
+    notify();
+    addNotification({ 
+      title: active ? 'Hub Lockdown Activated' : 'Hub Lockdown Deactivated', 
+      body: active ? `${hub.name} is now locked down.` : `${hub.name} is back online.`, 
+      type: active ? 'warning' : 'success' 
+    });
+  }
+};
+
+/* ── Attendance tracking ────────────────────────────────────────────────── */
+export const markAttendance = (studentId, date, status, teacherId) => {
+  const exists = state.attendance.find(a => a.studentId === studentId && a.date === date);
+  
+  if (exists) {
+    state = {
+      ...state,
+      attendance: state.attendance.map(a => 
+        (a.studentId === studentId && a.date === date) 
+          ? { ...a, status, markedBy: teacherId } 
+          : a
+      )
+    };
+  } else {
+    const newRecord = {
+      id: `att_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+      studentId,
+      date,
+      status,
+      markedBy: teacherId
+    };
+    state = { ...state, attendance: [newRecord, ...state.attendance] };
+  }
   notify();
+};
+
+// ── Leaves ──
+export const applyLeave = (leaveData) => {
+  const newLeave = {
+    id: `leave_${Date.now()}`,
+    status: 'pending',
+    appliedAt: new Date().toISOString(),
+    ...leaveData
+  };
+  state = { ...state, leaves: [newLeave, ...state.leaves] };
+  notify();
+  return newLeave;
+};
+
+export const updateLeaveStatus = (leaveId, status) => {
+  state = {
+    ...state,
+    leaves: state.leaves.map(l => l.id === leaveId ? { ...l, status } : l)
+  };
+  notify();
+};
+
+// ── Teacher Attendance ──
+export const teacherCheckIn = (teacherId) => {
+  const today = new Date().toISOString().split('T')[0];
+  const now = new Date().toLocaleTimeString();
+  const exists = state.teacherAttendance.find(a => a.teacherId === teacherId && a.date === today);
+  
+  if (!exists) {
+    const record = {
+      id: `tatt_${Date.now()}`,
+      teacherId,
+      date: today,
+      checkIn: now,
+      status: 'present'
+    };
+    state = { ...state, teacherAttendance: [record, ...state.teacherAttendance] };
+    notify();
+    addNotification({ title: 'Check-In Successful', body: `Good morning! You checked in at ${now}.`, type: 'success' });
+  }
+};
+
+export const teacherCheckOut = (teacherId) => {
+  const today = new Date().toISOString().split('T')[0];
+  const now = new Date().toLocaleTimeString();
+  state = {
+    ...state,
+    teacherAttendance: state.teacherAttendance.map(a => 
+      (a.teacherId === teacherId && a.date === today) 
+        ? { ...a, checkOut: now } 
+        : a
+    )
+  };
+  notify();
+  addNotification({ title: 'Check-Out Successful', body: `Have a great evening! You checked out at ${now}.`, type: 'info' });
 };
 
 export const removeHub = (id) => {

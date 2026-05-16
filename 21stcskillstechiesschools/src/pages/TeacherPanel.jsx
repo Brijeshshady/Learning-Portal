@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -9,7 +9,7 @@ import {
   AreaChartCard, BarChartCard, ActivityFeed, SectionCard,
 } from '../components/DashboardShell';
 import useStore from '../hooks/useStore';
-import { submitGrade, exportCSV, addNotification } from '../lib/store';
+import { submitGrade, exportCSV, addNotification, markAttendance, teacherCheckIn, teacherCheckOut, updateLeaveStatus } from '../lib/store';
 import Modal from '../components/Modal';
 
 
@@ -281,6 +281,157 @@ const CertificatesView = ({ students }) => {
   );
 };
 
+
+/* ── Attendance ───────────────────────────────────────────── */
+const AttendanceView = ({ students }) => {
+  const { attendance = [], teacherAttendance = [], leaves = [] } = useStore();
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const { user } = useAuth();
+
+  const handleMark = (studentId, status) => {
+    markAttendance(studentId, selectedDate, status, user?.id);
+  };
+
+  const handleMarkAll = () => {
+    students.forEach(s => markAttendance(s.id, selectedDate, 'present', user?.id));
+    addNotification({ title: 'Attendance Saved', body: `All students marked present for ${selectedDate}.`, type: 'success' });
+  };
+
+  const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === new Date().toISOString().split('T')[0]);
+  const pendingLeaves = leaves.filter(l => l.status === 'pending');
+
+  const currentRecords = attendance.filter(a => a.date === selectedDate);
+  const presentCount = currentRecords.filter(a => a.status === 'present').length;
+  const lateCount = currentRecords.filter(a => a.status === 'late').length;
+  const absentCount = currentRecords.filter(a => a.status === 'absent').length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Attendance Log</h2>
+              <p className="text-zinc-500 text-sm mt-1">Manage daily attendance for your roster.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <input 
+                  type="date" 
+                  value={selectedDate} 
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+              <button onClick={handleMarkAll} className="bg-blue-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20">
+                <CheckSquare className="w-3.5 h-3.5" /> Mark All Present
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <KpiCard label="Present Today" value={presentCount} icon={CheckCircle2} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" />
+            <KpiCard label="Late Today" value={lateCount} icon={AlertTriangle} iconBg="bg-amber-500/15" iconColor="text-amber-400" />
+            <KpiCard label="Absent Today" value={absentCount} icon={Lock} iconBg="bg-red-500/15" iconColor="text-red-400" />
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="border-b border-zinc-800">
+                <tr>{['Student', 'Grade', 'Current Status', 'Action'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {students.length === 0 ? (
+                  <tr><td colSpan="4" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No students available.</td></tr>
+                ) : (
+                  students.map((s) => {
+                    const record = currentRecords.find(a => a.studentId === s.id);
+                    const status = record?.status || 'unmarked';
+                    
+                    return (
+                      <tr key={s.id} className="hover:bg-white/[0.01] transition-all">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">{s.name[0]}</div>
+                            <p className="text-sm font-bold text-white">{s.name}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-xs font-bold text-zinc-500">Grade {s.grade}</td>
+                        <td className="px-6 py-4">
+                          {status === 'present' && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">Present</span>}
+                          {status === 'late' && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">Late</span>}
+                          {status === 'absent' && <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-md">Absent</span>}
+                          {status === 'unmarked' && <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Unmarked</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleMark(s.id, 'present')} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${status === 'present' ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-emerald-400'}`}><CheckCircle2 className="w-4 h-4" /></button>
+                            <button onClick={() => handleMark(s.id, 'late')} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${status === 'late' ? 'bg-amber-500 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-amber-400'}`}><AlertTriangle className="w-4 h-4" /></button>
+                            <button onClick={() => handleMark(s.id, 'absent')} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${status === 'absent' ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-red-400'}`}><Lock className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <SectionCard title="My Attendance">
+            <div className="flex flex-col gap-4 mt-2">
+              <div className="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Daily Check-In</p>
+                  <p className="text-lg font-black text-white mt-1">{myRecord?.checkIn || '--:--'}</p>
+                </div>
+                {!myRecord ? (
+                  <button onClick={() => teacherCheckIn(user.id)} className="bg-blue-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">Check In</button>
+                ) : !myRecord.checkOut ? (
+                  <button onClick={() => teacherCheckOut(user.id)} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all">Check Out</button>
+                ) : (
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Check-Out</p>
+                    <p className="text-sm font-bold text-white">{myRecord.checkOut}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Pending Leaves">
+            <div className="space-y-3 mt-3">
+              {pendingLeaves.length === 0 ? (
+                <p className="text-center py-6 text-zinc-600 text-[11px] font-bold italic">No pending requests.</p>
+              ) : (
+                pendingLeaves.map(leave => (
+                  <div key={leave.id} className="bg-zinc-800/40 border border-zinc-800 p-4 rounded-xl space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-[10px] uppercase">{leave.studentName[0]}</div>
+                      <div>
+                        <p className="text-xs font-black text-white">{leave.studentName}</p>
+                        <p className="text-[10px] text-zinc-500 font-bold">{leave.startDate} to {leave.endDate}</p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800">{leave.reason}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => updateLeaveStatus(leave.id, 'approved')} className="flex-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest py-2 rounded-lg hover:bg-emerald-500 hover:text-white transition-all">Approve</button>
+                      <button onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="flex-1 bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest py-2 rounded-lg hover:bg-red-500 hover:text-white transition-all">Reject</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── Main ─────────────────────────────────────────────────── */
 const TeacherPanel = () => {
   const [searchParams] = useSearchParams();
@@ -310,6 +461,7 @@ const TeacherPanel = () => {
     students: <StudentsView students={students} />, 
     submissions: <SubmissionsView />, 
     curriculum: <CurriculumView />, 
+    attendance: <AttendanceView students={students} />,
     certificates: <CertificatesView students={students} /> 
   };
   

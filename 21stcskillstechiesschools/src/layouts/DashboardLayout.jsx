@@ -18,17 +18,20 @@ const VIEW_TITLES = {
     schools:   'Hub Registry',
     certificates: 'Certificate Ledger',
     activation:'License Management',
+    attendance:'System Attendance',
     analytics: 'Platform Analytics',
   },
   'school-admin': {
     overview:  'Institution Overview',
     users:     'Manage Users',
+    attendance:'Hub Attendance',
     certificates: 'Hub Certificates',
     analytics: 'Institution Reports',
   },
   teacher: {
     overview:    'Class Overview',
     students:    'Student Roster',
+    attendance:  'Attendance Log',
     submissions: 'Grade Management',
     certificates: 'Issue Certificates',
     curriculum:  'Syllabus View',
@@ -37,6 +40,7 @@ const VIEW_TITLES = {
     overview: 'My Dashboard',
     'ai-lab': 'AI Innovation Lab',
     projects: 'My Projects',
+    attendance: 'My Attendance',
     roadmap:  '36-Week Roadmap',
     certificates: 'My Certificates',
     support:  'Support Center',
@@ -55,7 +59,7 @@ const DashboardLayout = () => {
   const [searchParams] = useSearchParams();
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
-  const { notifications, markRead, markAllRead, maintenanceMode, hubs = [] } = useStore();
+  const { notifications, maintenanceMode, hubs = [] } = useStore();
   
   const myNotifications = notifications.filter(n => !n.targetUser || n.targetUser === user?.id);
   const unreadCount = myNotifications.filter(n => !n.read).length;

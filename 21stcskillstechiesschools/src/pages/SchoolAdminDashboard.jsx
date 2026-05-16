@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye } from 'lucide-react';
+import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import { getHubData } from '../lib/mapping';
 import useStore from '../hooks/useStore';
-import { addUser, removeUser, updateUser, exportCSV, addNotification } from '../lib/store';
+import { addUser, removeUser, updateUser, exportCSV, addNotification, teacherCheckIn, teacherCheckOut } from '../lib/store';
 import Modal from '../components/Modal';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -301,6 +301,174 @@ const CertificatesView = () => {
   );
 };
 
+
+/* ── Hub Attendance ───────────────────────────────────── */
+const SchoolAttendanceView = () => {
+  const { users, attendance = [], teacherAttendance = [], leaves = [] } = useStore();
+  const { user } = useAuth();
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [activeTab, setActiveTab] = useState('students'); // 'students', 'teachers', 'leaves'
+
+  const students = users.filter(u => u.role === 'student' && u.schoolId === user?.schoolId);
+  const teachers = users.filter(u => u.role === 'teacher' && u.schoolId === user?.schoolId);
+  
+  const currentRecords = attendance.filter(a => a.date === selectedDate);
+  const currentTeacherRecords = teacherAttendance.filter(a => a.date === selectedDate);
+  
+  const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === new Date().toISOString().split('T')[0]);
+  const leaveRequests = leaves.filter(l => l.status === 'pending');
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Hub Attendance</h2>
+          <p className="text-zinc-500 text-sm mt-1">Attendance monitoring for your institution.</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-2 px-4 flex items-center gap-4">
+             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Self Check-In: <span className="text-white ml-2">{myRecord?.checkIn || '--:--'}</span></p>
+             {!myRecord ? (
+                <button onClick={() => teacherCheckIn(user.id)} className="bg-emerald-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600">In</button>
+             ) : !myRecord.checkOut ? (
+                <button onClick={() => teacherCheckOut(user.id)} className="bg-amber-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-amber-600">Out</button>
+             ) : null}
+          </div>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <input 
+              type="date" 
+              value={selectedDate} 
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl w-fit border border-zinc-800">
+        {[
+          { id: 'students', label: 'Student Logs', icon: Users },
+          { id: 'teachers', label: 'Staff Logs', icon: UserCheck },
+          { id: 'leaves',   label: 'Leave Requests', icon: FileText }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-zinc-500 hover:text-white'}`}
+          >
+            <tab.icon className="w-3.5 h-3.5" />
+            {tab.label}
+            {tab.id === 'leaves' && leaveRequests.length > 0 && <span className="w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center text-[8px] animate-pulse">{leaveRequests.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'students' && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="border-b border-zinc-800">
+              <tr>{['Student', 'Grade', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {students.length === 0 ? (
+                <tr><td colSpan="3" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No students available.</td></tr>
+              ) : (
+                students.map((s) => {
+                  const record = currentRecords.find(a => a.studentId === s.id);
+                  const status = record?.status || 'unmarked';
+                  
+                  return (
+                    <tr key={s.id} className="hover:bg-white/[0.01] transition-all">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-black text-xs">{s.name[0]}</div>
+                          <p className="text-sm font-bold text-white">{s.name}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-zinc-500">Grade {s.grade}</td>
+                      <td className="px-6 py-4">
+                        {status === 'present' && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">Present</span>}
+                        {status === 'late' && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">Late</span>}
+                        {status === 'absent' && <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-md">Absent</span>}
+                        {status === 'unmarked' && <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Unmarked</span>}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'teachers' && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="border-b border-zinc-800">
+              <tr>{['Teacher', 'Check-In', 'Check-Out', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {teachers.map((t) => {
+                const record = currentTeacherRecords.find(a => a.teacherId === t.id);
+                return (
+                  <tr key={t.id} className="hover:bg-white/[0.01]">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">{t.name[0]}</div>
+                        <p className="text-sm font-bold text-white">{t.name}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkIn || '--:--'}</td>
+                    <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkOut || '--:--'}</td>
+                    <td className="px-6 py-4">
+                      {record ? (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">On Duty</span>
+                      ) : (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Off Duty</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'leaves' && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="border-b border-zinc-800">
+              <tr>{['Student', 'Dates', 'Reason', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {leaves.length === 0 ? (
+                <tr><td colSpan="4" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No leave applications.</td></tr>
+              ) : (
+                leaves.map((l) => (
+                  <tr key={l.id} className="hover:bg-white/[0.01]">
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-white">{l.studentName || 'Student'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-white">{l.startDate} to {l.endDate}</td>
+                    <td className="px-6 py-4 text-xs text-zinc-500 italic max-w-xs truncate">{l.reason}</td>
+                    <td className="px-6 py-4">
+                      {l.status === 'pending' && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">Pending</span>}
+                      {l.status === 'approved' && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">Approved</span>}
+                      {l.status === 'rejected' && <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-md">Rejected</span>}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── Main ─────────────────────────────────────────────────── */
 const SchoolAdminDashboard = () => {
   const [searchParams] = useSearchParams();
@@ -335,6 +503,7 @@ const SchoolAdminDashboard = () => {
     overview:     <OverviewView schoolData={schoolData} stats={stats} />, 
     users:        <UsersView />, 
     analytics:    <AnalyticsView />, 
+    attendance:   <SchoolAttendanceView />,
     certificates: <CertificatesView /> 
   };
   return (

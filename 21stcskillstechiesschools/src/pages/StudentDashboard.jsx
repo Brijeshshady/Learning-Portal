@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Cpu, Bot, Rocket, HelpCircle, Lock, ExternalLink, ChevronRight, MessageSquare, Award, Download } from 'lucide-react';
+import { Zap, Cpu, Bot, Rocket, HelpCircle, Lock, ExternalLink, ChevronRight, MessageSquare, Award, Download, Database, BookOpen, CheckCircle2, AlertTriangle, Plus, FileText, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -9,8 +9,8 @@ import {
 } from '../components/DashboardShell';
 import Modal from '../components/Modal';
 import DB from '../lib/db';
-
-
+import { addNotification, applyLeave } from '../lib/store';
+import useStore from '../hooks/useStore';
 
 /* ── Overview ─────────────────────────────────────────────── */
 const OverviewView = ({ user, setView, certificates = [], stats }) => {
@@ -280,33 +280,54 @@ const AILabView = () => {
 };
 
 /* ── Projects ─────────────────────────────────────────────── */
-const ProjectsView = () => (
-  <div className="space-y-6">
-    <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Projects</h2><p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have built.</p></div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {[
-        { title: 'Smart Room Controller', week: 3, type: 'IoT', grade: 'A',   borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400' },
-        { title: 'AI Chatbot v1',         week: 5, type: 'AI',  grade: 'B+',  borderClass: 'border-primary/20',     textClass: 'text-primary' },
-        { title: 'Neural Logic Trainer',  week: 7, type: 'ML',  grade: null,  borderClass: 'border-secondary/20',   textClass: 'text-secondary' },
-      ].map((p) => (
-        <SectionCard key={p.title} className={`border ${p.borderClass}`}>
-          <div className="flex items-start justify-between mb-3">
-            <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
-            {p.grade
-              ? <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {p.grade}</span>
-              : <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">In Progress</span>
-            }
-          </div>
-          <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
-          <h3 className="text-base font-black text-white mb-4">{p.title}</h3>
-          <button className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}>
-            <ExternalLink className="w-3.5 h-3.5" /> View Project
-          </button>
-        </SectionCard>
-      ))}
+const ProjectsView = () => {
+  const [projects, setProjects] = useState([
+    { title: 'Smart Room Controller', week: 3, type: 'IoT', grade: 'A',   borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400', submitted: true },
+    { title: 'AI Chatbot v1',         week: 5, type: 'AI',  grade: 'B+',  borderClass: 'border-primary/20',     textClass: 'text-primary', submitted: true },
+    { title: 'Neural Logic Trainer',  week: 7, type: 'ML',  grade: null,  borderClass: 'border-secondary/20',   textClass: 'text-secondary', submitted: false },
+  ]);
+
+  const handleSubmit = (index) => {
+    const updated = [...projects];
+    updated[index].submitted = true;
+    setProjects(updated);
+    addNotification({ title: 'Project Submitted', body: `${updated[index].title} has been submitted for grading!`, type: 'success' });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Projects</h2><p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have built.</p></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {projects.map((p, index) => (
+          <SectionCard key={p.title} className={`border ${p.borderClass}`}>
+            <div className="flex items-start justify-between mb-3">
+              <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
+              {p.grade ? (
+                <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {p.grade}</span>
+              ) : p.submitted ? (
+                <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">Under Review</span>
+              ) : (
+                <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">In Progress</span>
+              )}
+            </div>
+            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
+            <h3 className="text-base font-black text-white mb-4">{p.title}</h3>
+            
+            {p.grade || p.submitted ? (
+              <button className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}>
+                <ExternalLink className="w-3.5 h-3.5" /> View Project
+              </button>
+            ) : (
+              <button onClick={() => handleSubmit(index)} className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2`}>
+                <Award className="w-3.5 h-3.5" /> Submit Project
+              </button>
+            )}
+          </SectionCard>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ── Roadmap ──────────────────────────────────────────────── */
 const RoadmapView = ({ setView }) => (
@@ -412,6 +433,130 @@ const CertificatesView = ({ user, certificates = [] }) => {
   );
 };
 
+/* ── Attendance ───────────────────────────────────────────── */
+const MyAttendanceView = ({ user }) => {
+  const { attendance = [], leaves = [] } = useStore();
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveData, setLeaveData] = useState({ startDate: '', endDate: '', reason: '' });
+
+  const myRecords = attendance.filter(a => a.studentId === user?.id);
+  const myLeaves = leaves.filter(l => l.studentId === user?.id);
+  
+  const totalDays = myRecords.length;
+  const presentDays = myRecords.filter(a => a.status === 'present').length;
+  const lateDays = myRecords.filter(a => a.status === 'late').length;
+  const absentDays = myRecords.filter(a => a.status === 'absent').length;
+  const attendanceRate = totalDays > 0 ? Math.round(((presentDays + lateDays) / totalDays) * 100) : 100;
+
+  const handleApplyLeave = (e) => {
+    e.preventDefault();
+    applyLeave({ studentId: user.id, studentName: user.name, ...leaveData });
+    setShowLeaveModal(false);
+    setLeaveData({ startDate: '', endDate: '', reason: '' });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Attendance</h2>
+          <p className="text-zinc-500 text-sm mt-1">Track your presence and punctuality across the curriculum.</p>
+        </div>
+        <button 
+          onClick={() => setShowLeaveModal(true)}
+          className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all shadow-lg shadow-black/20"
+        >
+          <FileText className="w-3.5 h-3.5" /> Apply for Leave
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard label="Attendance Rate" value={`${attendanceRate}%`} change={attendanceRate >= 85 ? "On Track" : "Needs Attention"} icon={Award} iconBg="bg-primary/15" iconColor="text-primary" />
+        <KpiCard label="Present" value={presentDays} icon={CheckCircle2} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" />
+        <KpiCard label="Late" value={lateDays} icon={AlertTriangle} iconBg="bg-amber-500/15" iconColor="text-amber-400" />
+        <KpiCard label="Absent" value={absentDays} icon={Lock} iconBg="bg-red-500/15" iconColor="text-red-400" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SectionCard title="Recent Attendance Logs">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-4">
+            <table className="w-full text-left">
+              <thead className="border-b border-zinc-800 bg-zinc-900/50">
+                <tr>{['Date', 'Status'].map(h => <th key={h} className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-zinc-500">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {myRecords.length === 0 ? (
+                  <tr><td colSpan="2" className="px-6 py-8 text-center text-zinc-600 text-xs font-bold">No attendance records found.</td></tr>
+                ) : (
+                  myRecords.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map((record) => (
+                    <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-white">{record.date}</td>
+                      <td className="px-6 py-4">
+                        {record.status === 'present' && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">Present</span>}
+                        {record.status === 'late' && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">Late</span>}
+                        {record.status === 'absent' && <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-md">Absent</span>}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="My Leave Requests">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mt-4">
+            <table className="w-full text-left">
+              <thead className="border-b border-zinc-800 bg-zinc-900/50">
+                <tr>{['Dates', 'Status'].map(h => <th key={h} className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-zinc-500">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {myLeaves.length === 0 ? (
+                  <tr><td colSpan="2" className="px-6 py-8 text-center text-zinc-600 text-xs font-bold">No leave requests found.</td></tr>
+                ) : (
+                  myLeaves.sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt)).map((leave) => (
+                    <tr key={leave.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-bold text-white">{leave.startDate} to {leave.endDate}</p>
+                        <p className="text-[10px] text-zinc-500 mt-0.5 line-clamp-1">{leave.reason}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {leave.status === 'pending' && <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md">Pending</span>}
+                        {leave.status === 'approved' && <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">Approved</span>}
+                        {leave.status === 'rejected' && <span className="text-[9px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-md">Rejected</span>}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      </div>
+
+      <Modal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} title="Apply for Leave">
+        <form onSubmit={handleApplyLeave} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Start Date</label>
+              <input required type="date" value={leaveData.startDate} onChange={(e) => setLeaveData({...leaveData, startDate: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">End Date</label>
+              <input required type="date" value={leaveData.endDate} onChange={(e) => setLeaveData({...leaveData, endDate: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Reason for Leave</label>
+            <textarea required value={leaveData.reason} onChange={(e) => setLeaveData({...leaveData, reason: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50 h-24 resize-none" placeholder="Explain why you need leave..." />
+          </div>
+          <button type="submit" className="w-full bg-primary text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">Submit Request</button>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
 /* ── Main ─────────────────────────────────────────────────── */
 const StudentDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -438,6 +583,7 @@ const StudentDashboard = () => {
     'ai-lab': <AILabView />,
     projects: <ProjectsView />,
     roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} />,
+    attendance: <MyAttendanceView user={user} />,
     certificates: <CertificatesView user={user} certificates={certificates} />,
     support:  <SupportView />,
   };

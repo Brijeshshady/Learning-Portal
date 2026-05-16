@@ -47,9 +47,19 @@ const AIChatWidget = () => {
       if (res.ok) {
         const data = await res.json();
         setChatHistory(prev => [...prev, { role: 'ai', ...data }]);
+      } else {
+        const errorData = await res.json();
+        setChatHistory(prev => [...prev, { 
+            role: 'ai', 
+            text: `Server Error: ${errorData.error || 'Failed to fetch AI response'}` 
+        }]);
       }
     } catch (err) {
       console.error("AI Chat Error:", err);
+      setChatHistory(prev => [...prev, { 
+          role: 'ai', 
+          text: `Network Error: ${err.message}` 
+      }]);
     } finally {
       setIsTyping(false);
     }
@@ -162,7 +172,7 @@ const AIChatWidget = () => {
                               />
                             </div>
                             <div className="grid grid-cols-1 gap-2 pt-2">
-                              {msg.richContent.concepts.map((c, ci) => (
+                              {(msg.richContent.concepts || []).map((c, ci) => (
                                 <div key={ci} className="flex items-center gap-2 text-[10px] text-zinc-400 font-medium bg-white/5 p-2 rounded-lg">
                                   <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                                   {c}
