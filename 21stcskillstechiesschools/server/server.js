@@ -9,6 +9,7 @@ const User = require('./models/User');
 const School = require('./models/School');
 const Token = require('./models/Token');
 const Progress = require('./models/Progress');
+const aiManager = require('./services/aiManager');
 
 const app = express();
 app.use(cors());
@@ -207,6 +208,22 @@ app.get('/api/tokens', protect, authorize('admin', 'school-admin'), async (req, 
     try {
         const tokens = await Token.find();
         res.json(tokens);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// AI Chat Route
+app.post('/api/ai/chat', protect, async (req, res) => {
+    try {
+        const { message } = req.body;
+        const userContext = {
+            name: req.user.name,
+            grade: req.user.grade || 7,
+            role: req.user.role
+        };
+        const response = await aiManager.getBalancedResponse(message, userContext);
+        res.json(response);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

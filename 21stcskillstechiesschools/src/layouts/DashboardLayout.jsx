@@ -8,6 +8,7 @@ import ToastContainer from '../components/ToastContainer';
 import SettingsModal from '../components/SettingsModal';
 import useStore from '../hooks/useStore';
 import { markAllRead, markRead } from '../lib/store';
+import AIChatWidget from '../components/AIChatWidget';
 
 /* Map view params to readable titles per role */
 const VIEW_TITLES = {
@@ -239,9 +240,10 @@ const DashboardLayout = () => {
         </main>
       </div>
 
-      {/* Global Toasts & Modals */}
+      {/* Global Toasts, Modals & AI */}
       <ToastContainer />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} user={user} />
+      <AIChatWidget />
     </div>
   );
 };
