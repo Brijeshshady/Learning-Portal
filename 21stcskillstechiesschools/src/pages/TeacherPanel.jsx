@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -282,8 +282,298 @@ const CertificatesView = ({ students }) => {
   );
 };
 
+/* ── Pending Inbox ─────────────────────────────────────────── */
+const PendingView = () => {
+  const { submissions, grades, leaves } = useStore();
+  const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' | 'leaves'
+  const [activeGrade, setActiveGrade] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
 
-/* ── Attendance ───────────────────────────────────────────── */
+  const pendingSubs = submissions.filter(s => !grades[s.id]);
+  const gradedSubs  = submissions.filter(s =>  grades[s.id]);
+  const pendingLeaves = leaves.filter(l => l.status === 'pending');
+
+  const handleGradeSubmit = (id) => {
+    if (!activeGrade[id]) return;
+    submitGrade(id, activeGrade[id]);
+    setExpandedId(null);
+    setActiveGrade(prev => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Pending Inbox</h2>
+        <p className="text-zinc-500 text-sm mt-1">All items awaiting your action — submissions to grade and leaves to review.</p>
+      </div>
+
+      {/* KPI row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-11 h-11 bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/70 mb-0.5">Ungraded</p>
+            <p className="text-3xl font-black text-white">{pendingSubs.length}</p>
+          </div>
+        </div>
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-11 h-11 bg-blue-500/20 rounded-xl flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-blue-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-500/70 mb-0.5">Leave Requests</p>
+            <p className="text-3xl font-black text-white">{pendingLeaves.length}</p>
+          </div>
+        </div>
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-11 h-11 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70 mb-0.5">Graded</p>
+            <p className="text-3xl font-black text-white">{gradedSubs.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-2xl border border-zinc-800 w-fit">
+        <button
+          onClick={() => setActiveTab('submissions')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'submissions' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'text-zinc-500 hover:text-white'
+          }`}
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+          Submissions
+          {pendingSubs.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center">{pendingSubs.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('leaves')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'leaves' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'text-zinc-500 hover:text-white'
+          }`}
+        >
+          <Calendar className="w-3.5 h-3.5" />
+          Leave Requests
+          {pendingLeaves.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">{pendingLeaves.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Submissions Tab ── */}
+      {activeTab === 'submissions' && (
+        <div className="space-y-3">
+          {pendingSubs.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-16 flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              </div>
+              <p className="text-white font-black text-lg">All caught up!</p>
+              <p className="text-zinc-500 text-sm text-center">No submissions awaiting your grade. Check back later.</p>
+            </div>
+          ) : (
+            pendingSubs.map(s => (
+              <motion.div
+                key={s.id}
+                layout
+                className="bg-zinc-900 border border-amber-500/20 rounded-2xl overflow-hidden"
+              >
+                {/* Row */}
+                <button
+                  onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}
+                  className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all"
+                >
+                  <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 font-black text-sm shrink-0">
+                    {(s.studentName || 'S')[0]}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-white">{s.studentName}</p>
+                    <p className="text-xs text-zinc-500 font-medium">Week {s.week}: {s.title}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[9px] text-zinc-600 font-black">{s.submittedAt}</span>
+                    <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" /> Pending
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${expandedId === s.id ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+
+                {/* Expanded grading panel */}
+                <AnimatePresence>
+                  {expandedId === s.id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden border-t border-zinc-800"
+                    >
+                      <div className="p-6 space-y-5">
+                        {/* Submission content */}
+                        <div className="bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-4">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Submission Content</p>
+                          <p className="text-sm text-zinc-300 leading-relaxed">{s.content || 'No content provided.'}</p>
+                        </div>
+
+                        {/* Grade picker */}
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Assign Grade</p>
+                          <div className="flex gap-2 flex-wrap items-center">
+                            {['A+', 'A', 'B+', 'B', 'C+', 'C', 'D'].map(g => (
+                              <button
+                                key={g}
+                                onClick={() => setActiveGrade(prev => ({ ...prev, [s.id]: g }))}
+                                className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
+                                  activeGrade[s.id] === g
+                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 scale-105'
+                                    : 'bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700'
+                                }`}
+                              >
+                                {g}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleGradeSubmit(s.id)}
+                            disabled={!activeGrade[s.id]}
+                            className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                              activeGrade[s.id]
+                                ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20'
+                                : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            {activeGrade[s.id] ? `Submit Grade: ${activeGrade[s.id]}` : 'Select a Grade First'}
+                          </button>
+                          <button
+                            onClick={() => setExpandedId(null)}
+                            className="px-5 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))
+          )}
+
+          {/* Graded section */}
+          {gradedSubs.length > 0 && (
+            <div className="mt-8">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3 px-1">Recently Graded</p>
+              <div className="space-y-2">
+                {gradedSubs.slice(0, 3).map(s => (
+                  <div key={s.id} className="bg-zinc-900 border border-emerald-500/10 rounded-xl p-4 flex items-center gap-4">
+                    <div className="w-9 h-9 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 font-black text-sm">{(s.studentName || 'S')[0]}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-white">{s.studentName}</p>
+                      <p className="text-xs text-zinc-500">Week {s.week}: {s.title}</p>
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">Grade: {grades[s.id]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Leave Requests Tab ── */}
+      {activeTab === 'leaves' && (
+        <div className="space-y-3">
+          {pendingLeaves.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-16 flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              </div>
+              <p className="text-white font-black text-lg">No pending requests!</p>
+              <p className="text-zinc-500 text-sm">All leave applications have been reviewed.</p>
+            </div>
+          ) : (
+            pendingLeaves.map(leave => (
+              <motion.div
+                key={leave.id}
+                layout
+                className="bg-zinc-900 border border-blue-500/20 rounded-2xl p-5"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-11 h-11 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 font-black text-sm shrink-0">
+                      {(leave.studentName?.[0] ?? '?')}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-black text-white">{leave.studentName ?? 'Unknown Student'}</p>
+                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                        {leave.startDate} → {leave.endDate}
+                      </p>
+                      <div className="mt-3 bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-3">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1.5">Reason</p>
+                        <p className="text-sm text-zinc-300 leading-relaxed">{leave.reason}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                      onClick={() => { updateLeaveStatus(leave.id, 'approved'); addNotification({ title: 'Leave Approved', body: `${leave.studentName}'s leave has been approved.`, type: 'success' }); }}
+                      className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" /> Approve
+                    </button>
+                    <button
+                      onClick={() => { updateLeaveStatus(leave.id, 'rejected'); addNotification({ title: 'Leave Rejected', body: `${leave.studentName}'s leave has been rejected.`, type: 'warning' }); }}
+                      className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+
+          {/* Resolved leaves */}
+          {leaves.filter(l => l.status !== 'pending').length > 0 && (
+            <div className="mt-8">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3 px-1">Resolved Requests</p>
+              <div className="space-y-2">
+                {leaves.filter(l => l.status !== 'pending').slice(0, 5).map(l => (
+                  <div key={l.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 font-black text-xs">{(l.studentName?.[0] ?? '?')}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-white">{l.studentName ?? 'Student'}</p>
+                      <p className="text-xs text-zinc-500">{l.startDate} → {l.endDate}</p>
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                      l.status === 'approved' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'
+                    }`}>{l.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AttendanceView = ({ students }) => {
   const { attendance = [], teacherAttendance = [], leaves = [] } = useStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -520,6 +810,7 @@ const TeacherPanel = () => {
   const views = { 
     overview: <OverviewView stats={stats} />, 
     students: <StudentsView students={students} />, 
+    pending:  <PendingView />,
     submissions: <SubmissionsView />, 
     curriculum: <CurriculumView />, 
     attendance: <AttendanceView students={students} />,
