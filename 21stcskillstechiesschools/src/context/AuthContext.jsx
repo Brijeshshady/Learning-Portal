@@ -15,8 +15,9 @@ export const AuthProvider = ({ children }) => {
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     const role       = localStorage.getItem('userRole');
     const email      = localStorage.getItem('userEmail');
+    const token      = localStorage.getItem('userToken');
 
-    if (isLoggedIn && VALID_ROLES.includes(role) && email) {
+    if (isLoggedIn && VALID_ROLES.includes(role) && email && token) {
       // Verify user still exists in store/DB to prevent stale redirects
       const storeUsers = getState().users || [];
       const exists = storeUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
@@ -27,16 +28,17 @@ export const AuthProvider = ({ children }) => {
           name:     localStorage.getItem('userName')  || exists.name,
           email:    email,
           role:     role,
+          token:    token,
           schoolId: localStorage.getItem('schoolCode') || exists.schoolId,
         });
       } else {
         // User no longer in system, purge session
-        ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'schoolCode'].forEach(k => localStorage.removeItem(k));
+        ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode'].forEach(k => localStorage.removeItem(k));
         setUser(null);
       }
-    } else if (isLoggedIn || role || email) {
+    } else if (isLoggedIn || role || email || token) {
       // Clear corrupted/partial session data
-      ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'schoolCode'].forEach(k => localStorage.removeItem(k));
+      ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode'].forEach(k => localStorage.removeItem(k));
     }
     setLoading(false);
   }, []);
@@ -45,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (email, password) => {
     const dbUser = await DB.login(email, password);
     
-    if (!dbUser) {
+    if (!dbUser || !dbUser.token) {
       throw new Error('Invalid email or password. Please try again.');
     }
 
@@ -54,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userRole',   dbUser.role);
     localStorage.setItem('userName',   dbUser.name);
     localStorage.setItem('userEmail',  dbUser.email);
+    localStorage.setItem('userToken',  dbUser.token);
     if (dbUser.schoolId) localStorage.setItem('schoolCode', dbUser.schoolId);
 
     const sessionUser = {
@@ -61,6 +64,7 @@ export const AuthProvider = ({ children }) => {
       name:     dbUser.name,
       email:    dbUser.email,
       role:     dbUser.role,
+      token:    dbUser.token,
       schoolId: dbUser.schoolId || null,
     };
     setUser(sessionUser);
@@ -80,7 +84,7 @@ export const AuthProvider = ({ children }) => {
   // ── Logout ──────────────────────────────────────────────────────────────────
   const logout = useCallback(() => {
     // Remove only auth-related keys, preserve platform state
-    ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'schoolCode'].forEach(k => localStorage.removeItem(k));
+    ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode'].forEach(k => localStorage.removeItem(k));
     setUser(null);
     // Hard navigate so the entire app re-mounts cleanly
     window.location.replace('/login');

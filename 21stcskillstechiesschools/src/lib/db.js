@@ -1,6 +1,14 @@
 import { getState, addUser } from './store';
 
-const API_BASE = '/api'; // Proxied via Vite to http://localhost:5000/api
+const API_BASE = '/api'; 
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('userToken');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : ''
+  };
+};
 
 const demoCertificates = [
   { id: 'CERT-A1B2-C3D4', studentId: 'USR-004', studentName: 'Arun Kumar', schoolId: 'HUB-CH-01', title: 'AI Innovation Lab - Beginner', issuedBy: 'Super Admin', date: '2026-05-01' },
@@ -56,73 +64,33 @@ const DB = {
   login: async (email, password) => {
     console.log('[DB] Attempting login for:', email);
     
-    // 1. Try API with a short timeout
     try {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 2000); // 2s timeout
-      
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
-        signal: controller.signal
       });
-      clearTimeout(id);
       
       if (res.ok) {
         const data = await res.json();
         console.log('[DB] API Login Success');
         return data.user;
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Login failed');
       }
     } catch (err) {
-      console.warn('[DB] API connection failed or timed out. Using local fallback.');
+      console.error('[DB] Login Error:', err.message);
+      throw err;
     }
-
-    // 2. Local Fallback (Store + Hardcoded)
-    let allUsers = [];
-    try {
-      const storeState = getState();
-      allUsers = storeState.users || [];
-      console.log(`[DB] Checking ${allUsers.length} users from store`);
-    } catch (e) {
-      console.error('[DB] Could not load store for login fallback', e);
-    }
-
-    // Always include the core demo users as a safety net
-    const coreDemoUsers = [
-      { id: 'USR-001', email: 'superadmin@21stc.com', password: 'password123', role: 'admin',        name: 'Super Admin',      schoolId: null },
-      { id: 'USR-002', email: 'hubadmin@21stc.com',   password: 'password123', role: 'school-admin', name: 'Hub Manager',       schoolId: 'HUB-CH-01' },
-      { id: 'USR-003', email: 'teacher@21stc.com',    password: 'password123', role: 'teacher',      name: 'Ms. Kavitha',       schoolId: 'HUB-CH-01' },
-      { id: 'USR-004', email: 'student@21stc.com',    password: 'password123', role: 'student',      name: 'Arun Kumar',        schoolId: 'HUB-CH-01' },
-    ];
-
-    // Combine lists, preferring store users if duplicates exist
-    const combined = [...allUsers];
-    coreDemoUsers.forEach(du => {
-      if (!combined.find(u => u.email.toLowerCase() === du.email.toLowerCase())) {
-        combined.push(du);
-      }
-    });
-
-    const found = combined.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && 
-             (u.password === password || password === 'password123' || u.password === 'password123')
-    );
-
-    if (found) {
-      console.log('[DB] Local Login Success for:', found.role);
-      const { password: _pw, ...safeUser } = found;
-      return safeUser;
-    }
-
-    console.error('[DB] Login Failed: User not found or password mismatch');
-    throw new Error('Invalid credentials');
   },
 
   // ─── USERS ─────────────────────────────────────────────────────────────────
   getUser: async (email) => {
     try {
-      const res = await fetch(`${API_BASE}/users/${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_BASE}/users/${encodeURIComponent(email)}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     return null;
@@ -130,7 +98,9 @@ const DB = {
 
   getUsersBySchool: async (schoolId) => {
     try {
-      const res = await fetch(`${API_BASE}/users?schoolId=${encodeURIComponent(schoolId)}`);
+      const res = await fetch(`${API_BASE}/users?schoolId=${encodeURIComponent(schoolId)}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     // Demo fallback
@@ -144,7 +114,9 @@ const DB = {
 
   getAllUsers: async () => {
     try {
-      const res = await fetch(`${API_BASE}/users`);
+      const res = await fetch(`${API_BASE}/users`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     return [];
@@ -153,7 +125,9 @@ const DB = {
   // ─── PROGRESS ──────────────────────────────────────────────────────────────
   getProgress: async (userId) => {
     try {
-      const res = await fetch(`${API_BASE}/progress/${encodeURIComponent(userId)}`);
+      const res = await fetch(`${API_BASE}/progress/${encodeURIComponent(userId)}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     // Demo fallback
@@ -164,7 +138,7 @@ const DB = {
     try {
       const res = await fetch(`${API_BASE}/progress/${encodeURIComponent(userId)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(update),
       });
       if (res.ok) return await res.json();
@@ -175,7 +149,9 @@ const DB = {
   // ─── SCHOOLS ───────────────────────────────────────────────────────────────
   getSchools: async () => {
     try {
-      const res = await fetch(`${API_BASE}/schools`);
+      const res = await fetch(`${API_BASE}/schools`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     
@@ -194,7 +170,7 @@ const DB = {
     try {
       const res = await fetch(`${API_BASE}/schools/${encodeURIComponent(schoolId)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(update),
       });
       if (res.ok) return await res.json();
@@ -205,7 +181,9 @@ const DB = {
   // ─── DASHBOARD STATS ───────────────────────────────────────────────────────
   getDashboardStats: async (role, id) => {
     try {
-      const res = await fetch(`${API_BASE}/dashboard/stats?role=${role}&id=${id || ''}`);
+      const res = await fetch(`${API_BASE}/dashboard/stats?role=${role}&id=${id || ''}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     
@@ -233,7 +211,9 @@ const DB = {
   // ─── TOKENS ────────────────────────────────────────────────────────────────
   getTokens: async () => {
     try {
-      const res = await fetch(`${API_BASE}/tokens`);
+      const res = await fetch(`${API_BASE}/tokens`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     return [];
@@ -243,7 +223,9 @@ const DB = {
   getCertificates: async (filters = {}) => {
     try {
       const qs = new URLSearchParams(filters).toString();
-      const res = await fetch(`${API_BASE}/certificates?${qs}`);
+      const res = await fetch(`${API_BASE}/certificates?${qs}`, {
+        headers: getAuthHeaders()
+      });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     
@@ -258,7 +240,7 @@ const DB = {
     try {
       const res = await fetch(`${API_BASE}/certificates`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ studentId, title, issuedBy: issuerName, schoolId }),
       });
       if (res.ok) return await res.json();
@@ -290,6 +272,7 @@ const DB = {
     try {
       const res = await fetch(`${API_BASE}/certificates/${encodeURIComponent(certId)}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
       });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
