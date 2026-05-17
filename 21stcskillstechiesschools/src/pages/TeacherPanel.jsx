@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -48,7 +48,14 @@ const ProgressBar = ({ value, color = 'bg-primary' }) => (
 
 const StudentsView = ({ students }) => {
   const [search, setSearch] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [profileTab, setProfileTab] = useState('roadmap'); // 'roadmap' | 'submissions' | 'attendance' | 'certificates'
   
+  const store = useStore();
+  const submissions = store.submissions || [];
+  const attendance = store.attendance || [];
+  const certificates = store.certificates || [];
+
   const filtered = students.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -57,6 +64,7 @@ const StudentsView = ({ students }) => {
         <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Student Roster</h2><p className="text-zinc-500 text-sm mt-1">All students in your assigned grades.</p></div>
         <div className="relative w-60"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search students…" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 transition-all" /></div>
       </div>
+      
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
         <table className="w-full text-left">
           <thead className="border-b border-zinc-800"><tr>{['Student', 'Grade', 'Week', 'Progress', 'Status', ''].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr></thead>
@@ -72,13 +80,314 @@ const StudentsView = ({ students }) => {
                   <td className="px-6 py-4 text-xs text-zinc-500 font-bold">Week {s.progress?.currentWeek || 0}</td>
                   <td className="px-6 py-4 w-36"><div className="flex items-center gap-2"><div className="flex-1"><ProgressBar value={Number(pct)} color={isAtRisk ? 'bg-red-500' : 'bg-blue-500'} /></div><span className="text-[9px] font-black text-zinc-500 w-7 text-right">{pct}%</span></div></td>
                   <td className="px-6 py-4">{isAtRisk ? <span className="text-[9px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg uppercase">At Risk</span> : <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg uppercase">On Track</span>}</td>
-                  <td className="px-6 py-4 text-right"><button onClick={() => addNotification({ title: 'Student View', body: `Viewing full profile for ${s.name} is under development.` })} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg hover:border-blue-500/30 text-zinc-400 hover:text-blue-400 transition-all">View</button></td>
+                  <td className="px-6 py-4 text-right"><button onClick={() => { setSelectedStudent(s); setProfileTab('roadmap'); }} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg hover:border-blue-500/30 text-zinc-400 hover:text-blue-400 transition-all">View</button></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      <AnimatePresence>
+        {selectedStudent && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedStudent(null)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 pointer-events-auto"
+            />
+            <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="bg-zinc-950 border border-zinc-850 w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh]"
+              >
+                {/* Header Profile Card */}
+                <div className="relative p-8 border-b border-zinc-800/80 bg-gradient-to-r from-blue-950/20 via-zinc-950 to-purple-950/10 shrink-0">
+                  <button
+                    onClick={() => setSelectedStudent(null)}
+                    className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all animate-none"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-blue-500/20 shrink-0">
+                      {selectedStudent.name[0]}
+                    </div>
+                    <div className="text-center md:text-left space-y-1.5 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 justify-center md:justify-start">
+                        <h3 className="text-2xl font-black font-headline text-white tracking-tight">{selectedStudent.name}</h3>
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md">
+                          Grade {selectedStudent.grade}
+                        </span>
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-zinc-850 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md">
+                          Student
+                        </span>
+                      </div>
+                      <p className="text-zinc-400 text-xs font-bold">{selectedStudent.email || `${selectedStudent.name.toLowerCase().replace(/\s+/g, '')}@21stc.com`}</p>
+                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">{selectedStudent.schoolId || 'HUB-CH-01'}</p>
+                    </div>
+
+                    {/* Quick Stats Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800/80 w-full md:w-auto shrink-0">
+                      <div className="px-4 py-2 text-center border-r border-zinc-800/50 last:border-0">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">Progress</p>
+                        <p className="text-base font-black text-white">
+                          {selectedStudent.progress ? Math.min((selectedStudent.progress.currentWeek / 36) * 100, 100).toFixed(0) : 0}%
+                        </p>
+                      </div>
+                      <div className="px-4 py-2 text-center border-r border-zinc-800/50 last:border-0">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">Roadmap</p>
+                        <p className="text-base font-black text-emerald-400">Wk {selectedStudent.progress?.currentWeek || 0}</p>
+                      </div>
+                      <div className="px-4 py-2 text-center border-r border-zinc-800/50 last:border-0">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">Attendance</p>
+                        <p className="text-base font-black text-blue-400">95%</p>
+                      </div>
+                      <div className="px-4 py-2 text-center last:border-0">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">Credentials</p>
+                        <p className="text-base font-black text-purple-400">
+                          {certificates.filter(c => c.studentId === selectedStudent.id).length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabs Navigation */}
+                <div className="flex border-b border-zinc-900 bg-zinc-950 px-8 py-3 shrink-0 gap-1 overflow-x-auto">
+                  {[
+                    { id: 'roadmap', label: 'Roadmap Progress', icon: Activity },
+                    { id: 'submissions', label: 'Assignments', icon: ClipboardList },
+                    { id: 'attendance', label: 'Attendance Logs', icon: Calendar },
+                    { id: 'certificates', label: 'Credentials', icon: Award }
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setProfileTab(tab.id)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                          profileTab === tab.id
+                            ? 'bg-zinc-900 border border-zinc-800 text-white shadow-md'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Tab Contents Area */}
+                <div className="p-8 overflow-y-auto flex-1 bg-zinc-950">
+                  {profileTab === 'roadmap' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest">36-Week Learning Journey</h4>
+                        <p className="text-xs text-zinc-500 mt-1">Visualize completed milestones, active lessons, and future subjects.</p>
+                      </div>
+
+                      {/* Dynamic Roadmap Grid of 36 Weeks */}
+                      <div className="grid grid-cols-6 sm:grid-cols-9 gap-3">
+                        {Array.from({ length: 36 }).map((_, idx) => {
+                          const wNum = idx + 1;
+                          const isCompleted = selectedStudent.progress?.completedWeeks?.includes(wNum) || wNum < (selectedStudent.progress?.currentWeek || 0);
+                          const isActive = wNum === (selectedStudent.progress?.currentWeek || 0);
+                          
+                          let category = 'Robotics Foundation';
+                          let catBg = 'border-amber-500/20 text-amber-500 bg-amber-500/5';
+                          if (wNum > 12 && wNum <= 24) {
+                            category = 'Python for AI';
+                            catBg = 'border-blue-500/20 text-blue-500 bg-blue-500/5';
+                          } else if (wNum > 24) {
+                            category = 'Advanced AI';
+                            catBg = 'border-purple-500/20 text-purple-500 bg-purple-500/5';
+                          }
+
+                          return (
+                            <div
+                              key={wNum}
+                              className={`group relative aspect-square border rounded-2xl flex flex-col items-center justify-center transition-all ${
+                                isCompleted
+                                  ? 'bg-emerald-500/5 border-emerald-500/30 text-emerald-400 shadow-md shadow-emerald-500/5'
+                                  : isActive
+                                  ? 'bg-blue-500/10 border-blue-500/40 text-blue-400 shadow-lg shadow-blue-500/10'
+                                  : 'bg-zinc-900/30 border-zinc-900 text-zinc-700'
+                              }`}
+                            >
+                              <span className="text-xs font-black font-headline">{wNum}</span>
+                              <span className="text-[7px] font-black uppercase tracking-wider mt-0.5 opacity-60">
+                                {isCompleted ? 'Done' : isActive ? 'Active' : 'Locked'}
+                              </span>
+
+                              {/* Rich Tooltip on Hover */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-900 border border-zinc-800 p-3 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 space-y-1">
+                                <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Week {wNum}</p>
+                                <p className="text-[10px] font-black text-white">{category}</p>
+                                <p className={`text-[8px] px-2 py-0.5 rounded border w-fit ${catBg} font-black uppercase`}>
+                                  {isCompleted ? 'Completed' : isActive ? 'In Progress' : 'Locked'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Legend Bar */}
+                      <div className="flex gap-6 border-t border-zinc-900 pt-5 justify-center">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500 font-headline">
+                          <span className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/30 block shrink-0" /> Completed
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500 font-headline">
+                          <span className="w-3 h-3 rounded-full bg-blue-500/20 border border-blue-500/35 block shrink-0" /> Active Week
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-zinc-500 font-headline">
+                          <span className="w-3 h-3 rounded-full bg-zinc-900/50 border border-zinc-800 block shrink-0" /> Locked
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {profileTab === 'submissions' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest">Assignment Submissions</h4>
+                        <p className="text-xs text-zinc-500 mt-1">Review assignments submitted and scores graded.</p>
+                      </div>
+
+                      {submissions.filter(sub => sub.studentId === selectedStudent.id).length === 0 ? (
+                        <div className="bg-zinc-900/30 border border-zinc-900 p-12 text-center rounded-3xl space-y-2">
+                          <ClipboardList className="w-8 h-8 text-zinc-800 mx-auto" />
+                          <p className="text-xs font-bold text-zinc-600">No submissions uploaded yet.</p>
+                        </div>
+                      ) : (
+                        <div className="bg-zinc-900 border border-zinc-900 rounded-2xl overflow-hidden">
+                          <table className="w-full text-left">
+                            <thead>
+                              <tr className="border-b border-zinc-900 bg-zinc-900/20">
+                                {['Week', 'Assignment', 'Submitted', 'Status', 'Grade'].map(h => (
+                                  <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-900">
+                              {submissions.filter(sub => sub.studentId === selectedStudent.id).map(sub => (
+                                <tr key={sub.id} className="hover:bg-white/[0.01] transition-all">
+                                  <td className="px-6 py-4 text-xs font-bold text-zinc-400">Week {sub.week}</td>
+                                  <td className="px-6 py-4">
+                                    <p className="text-xs font-black text-white">{sub.title}</p>
+                                    <p className="text-[10px] text-zinc-500 font-bold truncate max-w-xs">{sub.content}</p>
+                                  </td>
+                                  <td className="px-6 py-4 text-[10px] text-zinc-500 font-bold">{sub.submittedAt}</td>
+                                  <td className="px-6 py-4">
+                                    {sub.status === 'graded' ? (
+                                      <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg uppercase">Graded</span>
+                                    ) : (
+                                      <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg uppercase">Pending Review</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono font-black text-blue-400">
+                                    {sub.status === 'graded' ? 'Grade A' : '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {profileTab === 'attendance' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest">Attendance History</h4>
+                        <p className="text-xs text-zinc-500 mt-1">Detailed history of daily physical check-ins.</p>
+                      </div>
+
+                      {attendance.filter(att => att.studentId === selectedStudent.id).length === 0 ? (
+                        <div className="bg-zinc-900/30 border border-zinc-900 p-12 text-center rounded-3xl space-y-2">
+                          <Calendar className="w-8 h-8 text-zinc-800 mx-auto" />
+                          <p className="text-xs font-bold text-zinc-600">No attendance registered for this student.</p>
+                        </div>
+                      ) : (
+                        <div className="bg-zinc-900 border border-zinc-900 rounded-2xl overflow-hidden">
+                          <table className="w-full text-left">
+                            <thead>
+                              <tr className="border-b border-zinc-900 bg-zinc-900/20">
+                                {['Date', 'Status', 'Verified By'].map(h => (
+                                  <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-900">
+                              {attendance.filter(att => att.studentId === selectedStudent.id).map(att => (
+                                <tr key={att.id} className="hover:bg-white/[0.01] transition-all">
+                                  <td className="px-6 py-4 text-xs font-bold text-white">{att.date}</td>
+                                  <td className="px-6 py-4">
+                                    {att.status === 'present' ? (
+                                      <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg uppercase">Present</span>
+                                    ) : att.status === 'late' ? (
+                                      <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg uppercase">Late</span>
+                                    ) : (
+                                      <span className="text-[9px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg uppercase">Absent</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-xs text-zinc-500 font-bold">Ms. Kavitha (Teacher)</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {profileTab === 'certificates' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest">Issued Credentials</h4>
+                        <p className="text-xs text-zinc-500 mt-1">Verified achievements and awards for this learner.</p>
+                      </div>
+
+                      {certificates.filter(c => c.studentId === selectedStudent.id).length === 0 ? (
+                        <div className="bg-zinc-900/30 border border-zinc-900 p-12 text-center rounded-3xl space-y-2">
+                          <Award className="w-8 h-8 text-zinc-800 mx-auto" />
+                          <p className="text-xs font-bold text-zinc-600">No credentials issued to this learner yet.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {certificates.filter(c => c.studentId === selectedStudent.id).map(c => (
+                            <div key={c.id} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 relative overflow-hidden flex flex-col justify-between h-40">
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-full pointer-events-none" />
+                              <Award className="w-6 h-6 text-purple-400 shrink-0" />
+                              <div className="mt-4">
+                                <h5 className="text-sm font-black text-white">{c.title}</h5>
+                                <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest mt-1">ID: {c.id}</p>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-zinc-800/80 pt-3 mt-3 text-[10px] text-zinc-400">
+                                <span>{c.date}</span>
+                                <span className="font-bold text-zinc-500">By {c.issuedBy}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
