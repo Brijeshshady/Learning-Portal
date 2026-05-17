@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Users, ShieldCheck, Key, BarChart3, PlusCircle, Upload,
   Search, Database, Activity, BadgeCheck, Settings as SettingsIcon,
-  TrendingUp, Download, Copy, AlertTriangle, Cpu, CheckCircle2, AlertCircle, Award, Trash2, Calendar, Lock, UserCheck, FileText
+  TrendingUp, Download, Copy, AlertTriangle, Cpu, CheckCircle2, AlertCircle, Award, Trash2, Calendar, Lock, UserCheck, FileText, MapPin, Zap
 } from 'lucide-react';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -192,7 +192,7 @@ const HubRegistryView = () => {
   const [editingHub, setEditingHub] = React.useState(null);
   const [showModal, setShowModal] = React.useState(false);
   const [formData, setFormData] = React.useState({ 
-    id: '', name: '', loc: '', status: 'active', studentLimit: 1000,
+    id: '', name: '', loc: '', mapsLink: '', status: 'active', studentLimit: 1000,
     mActive: false, mUntil: '', mMessage: '' 
   });
 
@@ -200,7 +200,7 @@ const HubRegistryView = () => {
 
   const handleOpenAdd = () => {
     setEditingHub(null);
-    setFormData({ id: '', name: '', loc: '', status: 'active', studentLimit: 1000, mActive: false, mUntil: '', mMessage: '' });
+    setFormData({ id: '', name: '', loc: '', mapsLink: '', status: 'active', studentLimit: 1000, mActive: false, mUntil: '', mMessage: '' });
     setShowModal(true);
   };
 
@@ -210,6 +210,7 @@ const HubRegistryView = () => {
       id: hub.id, 
       name: hub.name, 
       loc: hub.location || hub.loc, 
+      mapsLink: hub.mapsLink || '',
       status: hub.status || 'active', 
       studentLimit: hub.studentLimit || 1000,
       mActive: hub.maintenance?.active || false,
@@ -223,7 +224,8 @@ const HubRegistryView = () => {
     e.preventDefault();
     const hubData = { 
       name: formData.name, 
-      location: formData.loc, 
+      location: formData.loc,
+      mapsLink: formData.mapsLink.trim() || null,
       status: formData.status, 
       studentLimit: Number(formData.studentLimit),
       maintenance: {
@@ -253,7 +255,24 @@ const HubRegistryView = () => {
         {hubs.map((hub) => (
           <SectionCard key={hub.id} className={`border ${hub.color || 'border-zinc-800'}`}>
             <div className="flex items-start justify-between mb-5">
-              <div><p className={`text-[9px] font-black uppercase tracking-widest text-primary mb-1`}>{hub.id}</p><h3 className="text-lg font-black font-headline text-white">{hub.name}</h3><p className="text-sm text-zinc-500">{hub.location || hub.loc}</p></div>
+              <div>
+                <p className={`text-[9px] font-black uppercase tracking-widest text-primary mb-1`}>{hub.id}</p>
+                <h3 className="text-lg font-black font-headline text-white">{hub.name}</h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-sm text-zinc-500">{hub.location || hub.loc}</p>
+                  {hub.mapsLink && (
+                    <a
+                      href={hub.mapsLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full hover:bg-blue-500 hover:text-white transition-all"
+                    >
+                      <MapPin className="w-2.5 h-2.5" /> Maps
+                    </a>
+                  )}
+                </div>
+              </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex gap-2">
                   {hub.maintenance?.active && (
@@ -268,6 +287,15 @@ const HubRegistryView = () => {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => handleOpenEdit(hub)} className="text-[9px] font-black text-zinc-500 hover:text-white uppercase tracking-widest transition-colors">Edit</button>
+                  <button
+                    onClick={() => setHubMaintenance(hub.id, !hub.maintenance?.active)}
+                    className={`text-[9px] font-black uppercase tracking-widest transition-colors flex items-center gap-1 ${
+                      hub.maintenance?.active ? 'text-amber-400 hover:text-amber-300' : 'text-zinc-500 hover:text-amber-400'
+                    }`}
+                    title={hub.maintenance?.active ? 'Deactivate maintenance' : 'Activate maintenance'}
+                  >
+                    <Zap className="w-2.5 h-2.5" />{hub.maintenance?.active ? 'Live' : 'Maint'}
+                  </button>
                   <button onClick={() => { if(confirm('Delete hub?')) removeHub(hub.id) }} className="text-[9px] font-black text-zinc-500 hover:text-red-400 uppercase tracking-widest transition-colors">Delete</button>
                 </div>
               </div>
@@ -279,7 +307,19 @@ const HubRegistryView = () => {
               </div>
               <div className="bg-zinc-800/60 rounded-xl p-4 text-center"><p className={`text-2xl font-black font-headline text-primary`}>{hub.completion || '0%'}</p><p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mt-1">Avg Completion</p></div>
             </div>
-          </SectionCard>
+          {/* Maps button if link exists */}
+          {hub.mapsLink && (
+            <a
+              href={hub.mapsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MapPin className="w-3.5 h-3.5" /> Open in Google Maps
+            </a>
+          )}
+        </SectionCard>
         ))}
       </div>
 
@@ -290,7 +330,23 @@ const HubRegistryView = () => {
             <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Student Limit</label><input required value={formData.studentLimit} onChange={(e) => setFormData({...formData, studentLimit: e.target.value})} type="number" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" /></div>
           </div>
           <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Hub Name</label><input required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} type="text" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="e.g. Chennai Skillstech" /></div>
-          <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Location</label><input required value={formData.loc} onChange={(e) => setFormData({...formData, loc: e.target.value})} type="text" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="e.g. Chennai Central" /></div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Location (City/Area)</label>
+            <input required value={formData.loc} onChange={(e) => setFormData({...formData, loc: e.target.value})} type="text" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="e.g. Chennai Central" />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1 flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-blue-400" /> Google Maps Link
+            </label>
+            <input
+              value={formData.mapsLink}
+              onChange={(e) => setFormData({...formData, mapsLink: e.target.value})}
+              type="url"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 placeholder:text-zinc-600"
+              placeholder="https://maps.google.com/..."
+            />
+            <p className="text-[9px] text-zinc-600 font-medium mt-1 px-1">Paste the Google Maps share link or place URL for this hub location.</p>
+          </div>
           
           <div className="pt-4 border-t border-zinc-800 mt-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-4 flex items-center gap-2"><AlertTriangle className="w-3 h-3" /> Hub Maintenance Mode</h4>

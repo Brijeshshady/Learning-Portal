@@ -20,8 +20,10 @@ import {
   Zap,
   Award,
   Calendar,
+  Inbox,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import useStore from '../hooks/useStore';
 
 /* ─── Per-role navigation configs ──────────────────────────────────────────────
    Each item either goes to an external route OR drives an internal "view"
@@ -39,6 +41,7 @@ const MENUS = {
       { name: 'Attendance',    view: 'attendance',   icon: Calendar },
       { name: 'License Keys',  view: 'activation',icon: Key },
       { name: 'Analytics',     view: 'analytics', icon: Activity },
+      { name: 'Community',     route: '/community', icon: MessageSquare },
     ],
   },
   'school-admin': {
@@ -48,8 +51,10 @@ const MENUS = {
       { name: 'Institution',  view: 'overview',   icon: ShieldCheck },
       { name: 'Manage Users', view: 'users',      icon: UserCog },
       { name: 'Attendance',   view: 'attendance', icon: Calendar },
+      { name: 'Hub Pending',  view: 'pending',    icon: Inbox, badge: true },
       { name: 'Certificates', view: 'certificates', icon: Award },
       { name: 'Reports',      view: 'analytics',  icon: BarChart2 },
+      { name: 'Community',    route: '/community', icon: MessageSquare },
     ],
   },
   teacher: {
@@ -59,9 +64,11 @@ const MENUS = {
       { name: 'Class Overview',  view: 'overview',     icon: LayoutDashboard },
       { name: 'Student List',    view: 'students',     icon: Users },
       { name: 'Attendance',      view: 'attendance',   icon: Calendar },
+      { name: 'Pending Inbox',   view: 'pending',      icon: Inbox, badge: true },
       { name: 'Submissions',     view: 'submissions',  icon: ClipboardList },
       { name: 'Certificates',    view: 'certificates', icon: Award },
       { name: 'Syllabus View',   view: 'curriculum',   icon: BookOpen },
+      { name: 'Community',       route: '/community',  icon: MessageSquare },
     ],
   },
   student: {
@@ -72,8 +79,10 @@ const MENUS = {
       { name: 'AI Lab',           view: 'ai-lab',    icon: Bot },
       { name: 'My Projects',      view: 'projects',  icon: Rocket },
       { name: 'Attendance',       view: 'attendance', icon: Calendar },
+      { name: 'My Pending',       view: 'pending',    icon: Inbox, badge: true },
       { name: 'Weekly Roadmap',   view: 'roadmap',   icon: Zap },
       { name: 'Certificates',     view: 'certificates', icon: Award },
+      { name: 'Community',        route: '/community', icon: MessageSquare },
       { name: 'Support',          view: 'support',   icon: HelpCircle },
     ],
   },
@@ -90,6 +99,7 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+  const { submissions = [], grades = {}, leaves = [] } = useStore();
 
   const role   = user?.role || 'student';
   const config = MENUS[role] || MENUS.student;
@@ -101,12 +111,26 @@ const Sidebar = () => {
 
   const navigate = useNavigate();
 
-  const handleViewClick = (view) => {
+  // Live pending count for teacher & student & school-admin badges
+  const pendingSubsCount   = submissions.filter(s => !grades[s.id]).length;
+  const pendingLeavesCount = leaves.filter(l => l.status === 'pending').length;
+  const totalPending = pendingSubsCount + pendingLeavesCount;
+
+  // Student-specific pending: only their own submissions + leaves
+  const myPendingSubsCount   = submissions.filter(s => s.studentId === user?.id && !grades[s.id]).length;
+  const myPendingLeavesCount = leaves.filter(l => l.studentId === user?.id && l.status === 'pending').length;
+  const myTotalPending = myPendingSubsCount + myPendingLeavesCount;
+
+  const handleViewClick = (item) => {
+    // Items with a `route` go to a full page path
+    if (item.route) {
+      navigate(item.route);
+      return;
+    }
     if (location.pathname !== baseRoute) {
-      // Navigate back to the role's dashboard route with the view param
-      navigate(`${baseRoute}?v=${view}`, { replace: false });
+      navigate(`${baseRoute}?v=${item.view}`, { replace: false });
     } else {
-      setSearchParams({ v: view }, { replace: true });
+      setSearchParams({ v: item.view }, { replace: true });
     }
   };
 
@@ -135,40 +159,39 @@ const Sidebar = () => {
       <nav className="flex-1 px-3 pt-4 pb-2 space-y-0.5 overflow-y-auto">
         <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.25em] px-3 mb-3">Navigation</p>
         {links.map((item) => {
-          const isActive = isOnMyBase && activeView === item.view;
+          const badgeCount = item.badge
+            ? (role === 'teacher' ? totalPending
+              : role === 'student' ? myTotalPending
+              : role === 'school-admin' ? totalPending
+              : 0)
+            : 0;
+          const isActive = item.route
+            ? location.pathname === item.route
+            : isOnMyBase && activeView === item.view;
           return (
             <button
               key={item.name}
-              onClick={() => handleViewClick(item.view)}
+              onClick={() => handleViewClick(item)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-150 group text-left ${
-                isOnMyBase && activeView === item.view
+                isActive
                   ? `${accent.bg} text-white shadow-md ${accent.shadow}`
                   : 'text-zinc-500 hover:bg-white/[0.04] hover:text-white'
               }`}
             >
               <item.icon className="w-4 h-4 shrink-0" />
               <span className="text-sm font-semibold flex-1">{item.name}</span>
-              <ChevronRight className={`w-3 h-3 transition-all ${isActive ? 'opacity-60' : 'opacity-0 group-hover:opacity-30'}`} />
+              {badgeCount > 0 ? (
+                <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center animate-pulse shrink-0">
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </span>
+              ) : item.route ? (
+                <span className="text-[8px] font-black uppercase tracking-widest text-zinc-700 shrink-0">↗</span>
+              ) : (
+                <ChevronRight className={`w-3 h-3 transition-all shrink-0 ${isActive ? 'opacity-60' : 'opacity-0 group-hover:opacity-30'}`} />
+              )}
             </button>
           );
         })}
-
-        {/* ── Divider + Community ─ */}
-        <div className="my-3 border-t border-white/5"></div>
-        <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.25em] px-3 mb-2">Platform</p>
-        <NavLink
-          to="/community"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-150 text-sm font-semibold ${
-              isActive
-                ? 'bg-white/10 text-white'
-                : 'text-zinc-500 hover:bg-white/[0.04] hover:text-white'
-            }`
-          }
-        >
-          <MessageSquare className="w-4 h-4 shrink-0" />
-          <span>Community</span>
-        </NavLink>
       </nav>
 
       {/* ── User Card ────────────────────────────────────────────────────── */}

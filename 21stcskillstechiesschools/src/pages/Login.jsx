@@ -12,6 +12,8 @@ const Login = () => {
   const [loading,  setLoading]  = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [resetStep, setResetStep] = useState(1);
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetError, setResetError] = useState('');
 
   const { login, logout }  = useAuth();
   const [searchParams] = useSearchParams();
@@ -34,8 +36,8 @@ const Login = () => {
     try {
       const user = await login(email, password);
       navigate(ROLE_ROUTES[user.role] || '/dashboard', { replace: true });
-    } catch {
-      setError('Invalid credentials. Check the demo list below.');
+    } catch (err) {
+      setError(err.message || 'Invalid credentials. Check the demo list below.');
     } finally {
       setLoading(false);
     }
@@ -206,7 +208,7 @@ const Login = () => {
       <AnimatePresence>
         {showReset && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowReset(false); setResetStep(1); }} className="absolute inset-0 bg-background/90 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowReset(false); setResetStep(1); setResetError(''); setResetOtp(''); }} className="absolute inset-0 bg-background/90 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} className="glass-card w-full max-w-md p-12 rounded-[3.5rem] relative z-10 border border-white/10 text-center space-y-8">
               {resetStep === 1 ? (
                 <>
@@ -217,8 +219,15 @@ const Login = () => {
                     <h3 className="text-3xl font-black font-headline text-white">Check Your Mail</h3>
                     <p className="text-zinc-500 text-sm font-medium mt-2 leading-relaxed">Enter the 6-digit code sent to your registered email.</p>
                   </div>
-                  <input type="text" maxLength={6} placeholder="000000" className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-6 py-5 text-center text-3xl tracking-[0.5em] font-black text-white focus:outline-none focus:border-primary transition-all" />
-                  <button onClick={() => setResetStep(2)} className="w-full bg-primary text-white font-black py-5 rounded-[2rem] text-xs uppercase tracking-widest shadow-xl shadow-primary/20">Verify Code</button>
+                  <input type="text" maxLength={6} value={resetOtp} onChange={(e) => { setResetOtp(e.target.value); setResetError(''); }} placeholder="000000" className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-6 py-5 text-center text-3xl tracking-[0.5em] font-black text-white focus:outline-none focus:border-primary transition-all" />
+                  {resetError && <p className="text-red-400 text-xs font-bold">{resetError}</p>}
+                  <button onClick={() => {
+                    if (resetOtp.length !== 6) {
+                      setResetError('Please enter a valid 6-digit code.');
+                      return;
+                    }
+                    setResetStep(2);
+                  }} className="w-full bg-primary text-white font-black py-5 rounded-[2rem] text-xs uppercase tracking-widest shadow-xl shadow-primary/20">Verify Code</button>
                 </>
               ) : (
                 <>
@@ -229,7 +238,7 @@ const Login = () => {
                     <h3 className="text-3xl font-black font-headline text-white">All Set!</h3>
                     <p className="text-zinc-500 text-sm font-medium mt-2">Your password has been successfully reset.</p>
                   </div>
-                  <button onClick={() => { setShowReset(false); setResetStep(1); }} className="w-full bg-white text-black font-black py-5 rounded-[2rem] text-xs uppercase tracking-widest">Back to Login</button>
+                  <button onClick={() => { setShowReset(false); setResetStep(1); setResetOtp(''); setResetError(''); }} className="w-full bg-white text-black font-black py-5 rounded-[2rem] text-xs uppercase tracking-widest">Back to Login</button>
                 </>
               )}
             </motion.div>

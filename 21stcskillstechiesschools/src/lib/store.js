@@ -81,7 +81,10 @@ const initialSubmissions = [
   { id: 'sub_2', studentId: 'u2', studentName: 'Priya Selvi', week: 6, title: 'Neural Network Basics', submittedAt: 'Yesterday', status: 'graded', content: 'Basic ML models implementation.' },
 ];
 
-
+const initialCertificates = [
+  { id: 'CERT-A1B2-C3D4', studentId: 'u4', studentName: 'Arun Kumar', schoolId: 'HUB-CH-01', title: 'AI Innovation Lab - Beginner', issuedBy: 'Super Admin', date: '2026-05-01' },
+  { id: 'CERT-X9Y8-Z7W6', studentId: 'u5', studentName: 'Priya Selvi', schoolId: 'HUB-CH-01', title: 'Robotics Foundation', issuedBy: 'Hub Admin', date: '2026-04-15' },
+];
 
 /* ── Store state ───────────────────────────────────────────────────────── */
 const STORAGE_KEY = 'learning_portal_state_v2';
@@ -98,6 +101,7 @@ const loadState = () => {
     leaves: initialLeaves,
     teacherAttendance: initialTeacherAttendance,
     submissions: initialSubmissions,
+    certificates: initialCertificates,
     maintenanceMode: initialMaintenanceMode,
   };
   
@@ -125,6 +129,9 @@ const loadState = () => {
       // Ensure new keys that didn't exist in old cache are always present
       if (!merged.submissions || !Array.isArray(merged.submissions)) {
         merged.submissions = initialSubmissions;
+      }
+      if (!merged.certificates || !Array.isArray(merged.certificates)) {
+        merged.certificates = initialCertificates;
       }
       // Ensure all leaves have studentName (backfill from users if missing)
       merged.leaves = merged.leaves.map(l => ({
@@ -219,8 +226,8 @@ export const removeUser = (id) => {
 };
 
 // ── Notifications ──
-export const addNotification = ({ title, body, type = 'info' }) => {
-  const n = { id: `n${Date.now()}`, title, body, time: 'Just now', read: false, type };
+export const addNotification = ({ title, body, type = 'info', targetUser = null, targetRole = null }) => {
+  const n = { id: `n${Date.now()}`, title, body, time: 'Just now', read: false, type, targetUser, targetRole };
   state = { ...state, notifications: [n, ...state.notifications] };
   notify();
 };
@@ -255,14 +262,27 @@ export const toggleLike = (postId) => {
 
 // ── Grades ──
 export const submitGrade = (submissionId, grade) => {
+  const sub = state.submissions.find(s => s.id === submissionId);
   state = { 
     ...state, 
     grades: { ...state.grades, [submissionId]: grade },
     submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'graded' } : s)
   };
-  addNotification({ title: 'Grade Submitted', body: `Grade ${grade} recorded.`, type: 'success' });
+  // Notify the teacher/admin who graded
+  addNotification({ title: 'Grade Submitted', body: `Grade ${grade} recorded for ${sub?.studentName || 'student'}.`, type: 'success' });
+  // Notify the student directly
+  if (sub?.studentId) {
+    addNotification({
+      title: '🎓 Grade Received!',
+      body: `You received ${grade} for Week ${sub.week}: "${sub.title}". Keep it up!`,
+      type: 'success',
+      targetUser: sub.studentId
+    });
+  }
   notify();
 };
+
+export const reassignGrade = (submissionId, grade) => submitGrade(submissionId, grade);
 
 export const submitAssignment = (submission) => {
   const newSub = {
@@ -272,6 +292,16 @@ export const submitAssignment = (submission) => {
     ...submission
   };
   state = { ...state, submissions: [newSub, ...state.submissions] };
+  // Notify all teachers in the same school
+  const teachersInSchool = state.users.filter(u => u.role === 'teacher' && u.schoolId === submission.schoolId);
+  teachersInSchool.forEach(t => {
+    addNotification({
+      title: '📋 New Submission',
+      body: `${submission.studentName || 'A student'} submitted Week ${submission.week}: "${submission.title}".`,
+      type: 'info',
+      targetUser: t.id
+    });
+  });
   notify();
   return newSub;
 };
@@ -351,22 +381,60 @@ export const applyLeave = (leaveData) => {
     ...leaveData
   };
   state = { ...state, leaves: [newLeave, ...state.leaves] };
+  // Notify all teachers in the same school
+  const teachersInSchool = state.users.filter(u =>
+    (u.role === 'teacher' || u.role === 'school-admin') &&
+    u.schoolId === leaveData.schoolId
+  );
+  teachersInSchool.forEach(t => {
+    addNotification({
+      title: '📅 Leave Request',
+      body: `${leaveData.studentName || 'A student'} applied for leave from ${leaveData.startDate} to ${leaveData.endDate}.`,
+      type: 'warning',
+      targetUser: t.id
+    });
+  });
   notify();
   return newLeave;
 };
 
-export const updateLeaveStatus = (leaveId, status) => {
+export const updateLeaveStatus = (leaveId, status, reviewerName = '') => {
+  const leave = state.leaves.find(l => l.id === leaveId);
   state = {
     ...state,
-    leaves: state.leaves.map(l => l.id === leaveId ? { ...l, status } : l)
+    leaves: state.leaves.map(l => l.id === leaveId ? { ...l, status, reviewedAt: new Date().toISOString(), reviewedBy: reviewerName } : l)
   };
+  // Notify the student about the decision
+  if (leave?.studentId) {
+    const icon = status === 'approved' ? '✅' : '❌';
+    addNotification({
+      title: `${icon} Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+      body: status === 'approved'
+        ? `Your leave from ${leave.startDate} to ${leave.endDate} has been approved.`
+        : `Your leave request from ${leave.startDate} to ${leave.endDate} was not approved.`,
+      type: status === 'approved' ? 'success' : 'warning',
+      targetUser: leave.studentId
+    });
+  }
+  notify();
+};
+
+export const cancelLeave = (leaveId, studentId) => {
+  const leave = state.leaves.find(l => l.id === leaveId);
+  if (!leave || leave.studentId !== studentId || leave.status !== 'pending') return;
+  state = {
+    ...state,
+    leaves: state.leaves.filter(l => l.id !== leaveId)
+  };
+  addNotification({ title: 'Leave Cancelled', body: 'Your leave request has been cancelled.', type: 'info' });
   notify();
 };
 
 // ── Teacher Attendance ──
 export const teacherCheckIn = (teacherId, mode = 'onsite', coords = null) => {
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toLocaleTimeString();
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now = d.toLocaleTimeString();
   
   // Geofencing for On-Site Mode
   if (mode === 'onsite') {
@@ -395,12 +463,24 @@ export const teacherCheckIn = (teacherId, mode = 'onsite', coords = null) => {
     state = { ...state, teacherAttendance: [record, ...state.teacherAttendance] };
     notify();
     addNotification({ title: 'Check-In Successful', body: `Good morning! You checked in (${mode}) at ${now}.`, type: 'success' });
+  } else {
+    throw new Error('You have already checked in today.');
   }
 };
 
 export const teacherCheckOut = (teacherId) => {
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toLocaleTimeString();
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now = d.toLocaleTimeString();
+  
+  const exists = state.teacherAttendance.find(a => a.teacherId === teacherId && a.date === today);
+  if (!exists) {
+    throw new Error('You have not checked in today.');
+  }
+  if (exists.checkOut) {
+    throw new Error('You have already checked out today.');
+  }
+
   state = {
     ...state,
     teacherAttendance: state.teacherAttendance.map(a => 
@@ -416,6 +496,13 @@ export const teacherCheckOut = (teacherId) => {
 export const removeHub = (id) => {
   state = { ...state, hubs: state.hubs.filter((h) => h.id !== id) };
   notify();
+};
+
+// ── Certificates ──
+export const addCertificate = (cert) => {
+  state = { ...state, certificates: [cert, ...state.certificates] };
+  notify();
+  return cert;
 };
 
 // ── Maintenance Mode ──

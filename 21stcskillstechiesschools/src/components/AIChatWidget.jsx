@@ -238,11 +238,17 @@ const AIChatWidget = () => {
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-3xl pl-5 pr-32 py-4 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-secondary focus:ring-4 focus:ring-secondary/10 transition-all resize-none h-[60px]"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  <button type="button" className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors">
-                    <Mic className="w-4 h-4" />
-                  </button>
-                  <button type="button" className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors">
+                  <button type="button" onClick={() => {
+                    const evt = new CustomEvent('show-notification', { detail: { title: 'Image Upload', body: 'Image vision features are coming soon.', type: 'info' } });
+                    window.dispatchEvent(evt);
+                  }} className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors">
                     <ImageIcon className="w-4 h-4" />
+                  </button>
+                  <button type="button" onClick={() => {
+                    const evt = new CustomEvent('show-notification', { detail: { title: 'Voice Input', body: 'Voice transcription will be available in v3.0.', type: 'info' } });
+                    window.dispatchEvent(evt);
+                  }} className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors">
+                    <Mic className="w-4 h-4" />
                   </button>
                   <button 
                     type="submit" 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Cpu, Bot, Rocket, HelpCircle, Lock, ExternalLink, ChevronRight, MessageSquare, Award, Download, Database, BookOpen, CheckCircle2, AlertTriangle, Plus, FileText, X } from 'lucide-react';
+import { Zap, Cpu, Bot, Rocket, HelpCircle, Lock, ExternalLink, ChevronRight, MessageSquare, Award, Download, Database, BookOpen, CheckCircle2, AlertTriangle, Plus, FileText, X, Clock, Inbox, ThumbsUp, ThumbsDown, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -9,8 +9,10 @@ import {
 } from '../components/DashboardShell';
 import Modal from '../components/Modal';
 import DB from '../lib/db';
-import { addNotification, applyLeave, submitAssignment } from '../lib/store';
+import { addNotification, applyLeave, submitAssignment, cancelLeave } from '../lib/store';
 import useStore from '../hooks/useStore';
+import html2pdf from 'html2pdf.js';
+import CertificateTemplate from '../components/CertificateTemplate';
 
 /* ── Overview ─────────────────────────────────────────────── */
 const OverviewView = ({ user, setView, certificates = [], stats }) => {
@@ -240,7 +242,7 @@ const AILabView = () => {
                         </div>
                         <span className="text-xs text-zinc-400 font-mono font-medium ml-2">main.py</span>
                       </div>
-                      <button className="flex items-center gap-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/30 transition-colors">
+                      <button onClick={() => addNotification({ title: 'Code Executing', body: 'Connecting to compute node...', type: 'info' })} className="flex items-center gap-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/30 transition-colors">
                         <Zap className="w-3 h-3" /> Run Code
                       </button>
                     </div>
@@ -282,16 +284,29 @@ const AILabView = () => {
 /* ── Projects ─────────────────────────────────────────────── */
 const ProjectsView = ({ user }) => {
   const { submissions, grades } = useStore();
+  const [submitProject, setSubmitProject] = useState(null);
+  const [projectLink, setProjectLink] = useState('');
+  const [projectNotes, setProjectNotes] = useState('');
 
-  const handleSubmit = (p) => {
+  const handleOpenSubmit = (p) => {
+    setSubmitProject(p);
+    setProjectLink('');
+    setProjectNotes('');
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!submitProject) return;
+
     submitAssignment({
       studentId: user.id,
       studentName: user.name,
-      week: p.week,
-      title: p.title,
-      content: `Project contents for ${p.title}`
+      week: submitProject.week,
+      title: submitProject.title,
+      content: `Link: ${projectLink}\nNotes: ${projectNotes}`
     });
-    addNotification({ title: 'Project Submitted', body: `${p.title} has been submitted for grading!`, type: 'success' });
+    addNotification({ title: 'Project Submitted', body: `${submitProject.title} has been submitted for grading!`, type: 'success' });
+    setSubmitProject(null);
   };
 
   const getStatus = (p) => {
@@ -332,7 +347,7 @@ const ProjectsView = ({ user }) => {
                   <ExternalLink className="w-3.5 h-3.5" /> View Project
                 </button>
               ) : (
-                <button onClick={() => handleSubmit(p)} className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2`}>
+                <button onClick={() => handleOpenSubmit(p)} className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2`}>
                   <Award className="w-3.5 h-3.5" /> Submit Project
                 </button>
               )}
@@ -340,6 +355,35 @@ const ProjectsView = ({ user }) => {
           );
         })}
       </div>
+
+      {/* Submit Project Modal */}
+      <Modal isOpen={!!submitProject} onClose={() => setSubmitProject(null)} title={`Submit: ${submitProject?.title}`}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Link (GitHub, Drive, etc.)</label>
+            <input 
+              required 
+              type="url" 
+              value={projectLink} 
+              onChange={(e) => setProjectLink(e.target.value)} 
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-secondary/50" 
+              placeholder="https://github.com/..." 
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Additional Notes</label>
+            <textarea 
+              value={projectNotes} 
+              onChange={(e) => setProjectNotes(e.target.value)} 
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-secondary/50 h-24 resize-none" 
+              placeholder="Any comments for the instructor?" 
+            />
+          </div>
+          <button type="submit" className="w-full bg-secondary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)]">
+            Submit for Grading
+          </button>
+        </form>
+      </Modal>
     </div>
   );
 };
@@ -371,31 +415,72 @@ const RoadmapView = ({ setView }) => (
 );
 
 /* ── Support ──────────────────────────────────────────────── */
-const SupportView = () => (
-  <div className="space-y-6">
-    <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Support Center</h2><p className="text-zinc-500 text-sm mt-1">Get help from your teacher or the 21stc team.</p></div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SectionCard><div className="flex flex-col gap-4"><div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center"><MessageSquare className="text-primary w-5 h-5" /></div><h3 className="text-base font-black text-white">Ask Your Teacher</h3><p className="text-zinc-500 text-sm">Send a direct message to Ms. Kavitha for lesson help.</p><button className="bg-primary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">Open Message</button></div></SectionCard>
-      <SectionCard><div className="flex flex-col gap-4"><div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center"><HelpCircle className="text-secondary w-5 h-5" /></div><h3 className="text-base font-black text-white">FAQ & Guides</h3><p className="text-zinc-500 text-sm">Browse answers to common questions about the curriculum.</p><button className="bg-secondary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-purple-600 transition-all shadow-lg shadow-secondary/20">Browse FAQs</button></div></SectionCard>
-    </div>
-    <SectionCard title="Common Questions">
-      {['How do I unlock the next week?', 'Where can I rewatch module videos?', 'How is my grade calculated?', 'Can I submit late assignments?'].map((q) => (
-        <div key={q} className="flex items-center justify-between py-3.5 border-b border-zinc-800 last:border-0 hover:bg-white/[0.01] -mx-2 px-2 rounded-xl transition-all cursor-pointer group">
-          <span className="text-sm font-medium text-zinc-300">{q}</span>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-white transition-colors shrink-0" />
+const SupportView = () => {
+  const [expandedFaq, setExpandedFaq] = useState(null);
+  
+  const faqs = [
+    { q: 'How do I unlock the next week?', a: 'Weeks are unlocked automatically every Monday based on your cohort schedule, provided you have completed the previous week’s mandatory assignments.' },
+    { q: 'Where can I rewatch module videos?', a: 'Go to the Syllabus or AI Lab sections. You can access all previously completed modules and rewatch the videos at any time.' },
+    { q: 'How is my grade calculated?', a: 'Your final grade is an average of your weekly submissions (60%) and your Capstone Project (40%).' },
+    { q: 'Can I submit late assignments?', a: 'Yes, but late submissions will be marked as such and may incur a 10% penalty depending on your teacher’s policy.' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Support Center</h2><p className="text-zinc-500 text-sm mt-1">Get help from your teacher or the 21stc team.</p></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SectionCard><div className="flex flex-col gap-4"><div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center"><MessageSquare className="text-primary w-5 h-5" /></div><h3 className="text-base font-black text-white">Ask Your Teacher</h3><p className="text-zinc-500 text-sm">Send a direct message to your teacher for lesson help.</p><button onClick={() => window.location.href = '/community'} className="bg-primary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">Go to Forum</button></div></SectionCard>
+        <SectionCard><div className="flex flex-col gap-4"><div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center"><HelpCircle className="text-secondary w-5 h-5" /></div><h3 className="text-base font-black text-white">FAQ & Guides</h3><p className="text-zinc-500 text-sm">Browse answers to common questions about the curriculum.</p><button onClick={() => setExpandedFaq(faqs[0].q)} className="bg-secondary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-purple-600 transition-all shadow-lg shadow-secondary/20">Browse FAQs</button></div></SectionCard>
+      </div>
+      <SectionCard title="Common Questions">
+        <div className="space-y-2">
+          {faqs.map(({ q, a }) => (
+            <div key={q} className="border border-zinc-800 rounded-xl overflow-hidden transition-all bg-zinc-900/50">
+              <div onClick={() => setExpandedFaq(expandedFaq === q ? null : q)} className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/[0.02]">
+                <span className="text-sm font-bold text-white">{q}</span>
+                <ChevronRight className={`w-4 h-4 text-zinc-500 transition-transform ${expandedFaq === q ? 'rotate-90' : ''}`} />
+              </div>
+              <AnimatePresence>
+                {expandedFaq === q && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="px-4 pb-4 text-sm text-zinc-400 font-medium">
+                    {a}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))}
         </div>
-      ))}
-    </SectionCard>
-  </div>
-);
+      </SectionCard>
+    </div>
+  );
+};
 
 /* ── Certificates ─────────────────────────────────────────── */
 const CertificatesView = ({ user, certificates = [] }) => {
   const myCerts = certificates;
+  const certRef = useRef(null);
+  const [activeCert, setActiveCert] = useState(null);
 
-  const handleDownload = (certId) => {
-    // Mock PDF export action
-    window.print();
+  const handleDownload = (cert) => {
+    setActiveCert(cert);
+    addNotification({ title: 'Generating PDF...', body: `Certificate ${cert.id}.pdf is being generated.`, type: 'info' });
+    
+    setTimeout(() => {
+      if (certRef.current) {
+        const opt = {
+          margin:       0,
+          filename:     `${cert.title.replace(/\s+/g, '_')}_Certificate.pdf`,
+          image:        { type: 'jpeg', quality: 1 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'px', format: [1123, 794], orientation: 'landscape' }
+        };
+        
+        html2pdf().set(opt).from(certRef.current).save().then(() => {
+           addNotification({ title: 'Success', body: `Certificate downloaded successfully.`, type: 'success' });
+           setActiveCert(null);
+        });
+      }
+    }, 500); // Allow React state to render the template
   };
 
   return (
@@ -406,6 +491,9 @@ const CertificatesView = ({ user, certificates = [] }) => {
           <p className="text-zinc-500 text-sm mt-1">Credentials you have earned across modules.</p>
         </div>
       </div>
+      
+      {/* Hidden Certificate Template for PDF Generation */}
+      <CertificateTemplate cert={activeCert} ref={certRef} />
       
       {myCerts.length === 0 ? (
         <div className="border border-zinc-800 border-dashed rounded-2xl p-16 text-center">
@@ -435,7 +523,7 @@ const CertificatesView = ({ user, certificates = [] }) => {
                     <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Credential ID</span>
                     <span className="text-xs font-mono font-bold text-primary">{cert.id}</span>
                   </div>
-                  <button onClick={() => handleDownload(cert.id)} className="w-full bg-zinc-800 text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-700 transition-colors border border-zinc-700">
+                  <button onClick={() => handleDownload(cert)} className="w-full bg-zinc-800 text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-zinc-700 transition-colors border border-zinc-700">
                     <Download className="w-4 h-4" /> Download PDF
                   </button>
                 </div>
@@ -465,7 +553,7 @@ const MyAttendanceView = ({ user }) => {
 
   const handleApplyLeave = (e) => {
     e.preventDefault();
-    applyLeave({ studentId: user.id, studentName: user.name, ...leaveData });
+    applyLeave({ studentId: user.id, studentName: user.name, schoolId: user.schoolId, ...leaveData });
     setShowLeaveModal(false);
     setLeaveData({ startDate: '', endDate: '', reason: '' });
   };
@@ -572,6 +660,206 @@ const MyAttendanceView = ({ user }) => {
   );
 };
 
+/* ── My Pending Status ────────────────────────────────────── */
+const MyPendingView = ({ user }) => {
+  const { submissions = [], grades = {}, leaves = [] } = useStore();
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaveData, setLeaveData] = useState({ startDate: '', endDate: '', reason: '' });
+
+  const mySubmissions = submissions.filter(s => s.studentId === user?.id);
+  const myLeaves = leaves.filter(l => l.studentId === user?.id);
+
+  const pendingSubs = mySubmissions.filter(s => !grades[s.id]);
+  const gradedSubs  = mySubmissions.filter(s =>  grades[s.id]);
+  const pendingLeaves = myLeaves.filter(l => l.status === 'pending');
+  const resolvedLeaves = myLeaves.filter(l => l.status !== 'pending');
+
+  const handleApplyLeave = (e) => {
+    e.preventDefault();
+    applyLeave({ studentId: user.id, studentName: user.name, schoolId: user.schoolId, ...leaveData });
+    addNotification({ title: 'Leave Applied', body: 'Your leave request has been submitted.', type: 'success' });
+    setShowLeaveModal(false);
+    setLeaveData({ startDate: '', endDate: '', reason: '' });
+  };
+
+  const statusChip = (status) => {
+    const map = {
+      pending:  'text-amber-400 bg-amber-500/10 border-amber-500/20',
+      approved: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+      rejected: 'text-red-400 bg-red-500/10 border-red-500/20',
+      graded:   'text-blue-400 bg-blue-500/10 border-blue-500/20',
+    };
+    return map[status] || map.pending;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Pending</h2>
+          <p className="text-zinc-500 text-sm mt-1">Track your submissions awaiting grades and leave applications.</p>
+        </div>
+        <button
+          onClick={() => setShowLeaveModal(true)}
+          className="bg-primary text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-primary/20"
+        >
+          <Plus className="w-3.5 h-3.5" /> Apply for Leave
+        </button>
+      </div>
+
+      {/* KPI Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-amber-500/70 mb-2">Awaiting Grade</p>
+          <p className="text-3xl font-black text-white">{pendingSubs.length}</p>
+        </div>
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500/70 mb-2">Graded</p>
+          <p className="text-3xl font-black text-white">{gradedSubs.length}</p>
+        </div>
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-blue-500/70 mb-2">Leaves Pending</p>
+          <p className="text-3xl font-black text-white">{pendingLeaves.length}</p>
+        </div>
+        <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Leaves Resolved</p>
+          <p className="text-3xl font-black text-white">{resolvedLeaves.length}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Submissions Status ── */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-black text-white">My Submissions</p>
+              <p className="text-xs text-zinc-500 font-medium mt-0.5">Assignment submission history</p>
+            </div>
+            <Inbox className="w-4 h-4 text-zinc-600" />
+          </div>
+          <div className="divide-y divide-zinc-800">
+            {mySubmissions.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-zinc-600 font-bold text-sm">No submissions yet.</p>
+                <p className="text-zinc-700 text-xs mt-1">Submit your first project from the Projects view.</p>
+              </div>
+            ) : (
+              mySubmissions.map(s => {
+                const grade = grades[s.id];
+                return (
+                  <div key={s.id} className="p-4 flex items-center gap-4 hover:bg-white/[0.01] transition-all">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                      grade ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {grade ? '✓' : '⏳'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">Week {s.week}: {s.title}</p>
+                      <p className="text-xs text-zinc-500">{s.submittedAt}</p>
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border shrink-0 ${
+                      grade ? statusChip('graded') : statusChip('pending')
+                    }`}>
+                      {grade ? `Grade: ${grade}` : 'Pending'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ── Leave Requests Status ── */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-black text-white">My Leave Requests</p>
+              <p className="text-xs text-zinc-500 font-medium mt-0.5">Applied leave history and status</p>
+            </div>
+            <Calendar className="w-4 h-4 text-zinc-600" />
+          </div>
+          <div className="divide-y divide-zinc-800">
+            {myLeaves.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-zinc-600 font-bold text-sm">No leave requests.</p>
+                <button
+                  onClick={() => setShowLeaveModal(true)}
+                  className="mt-3 text-primary text-xs font-black uppercase tracking-widest hover:underline"
+                >
+                  + Apply Now
+                </button>
+              </div>
+            ) : (
+              myLeaves.map(l => (
+                <div key={l.id} className="p-4 hover:bg-white/[0.01] transition-all">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                          statusChip(l.status)
+                        }`}>
+                          {l.status === 'pending' ? '⏳ Pending Review' : l.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
+                        </span>
+                        {l.status === 'pending' && (
+                          <button
+                            onClick={() => cancelLeave(l.id, user?.id)}
+                            className="text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            × Cancel
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-white">{l.startDate} → {l.endDate}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{l.reason}</p>
+                    </div>
+                    {l.status === 'approved' && (
+                      <div className="w-8 h-8 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
+                        <ThumbsUp className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                    )}
+                    {l.status === 'rejected' && (
+                      <div className="w-8 h-8 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center shrink-0">
+                        <ThumbsDown className="w-3.5 h-3.5 text-red-400" />
+                      </div>
+                    )}
+                    {l.status === 'pending' && (
+                      <div className="w-8 h-8 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Apply Leave Modal */}
+      <Modal isOpen={showLeaveModal} onClose={() => setShowLeaveModal(false)} title="Apply for Leave">
+        <form onSubmit={handleApplyLeave} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Start Date</label>
+              <input required type="date" value={leaveData.startDate} onChange={(e) => setLeaveData({...leaveData, startDate: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">End Date</label>
+              <input required type="date" value={leaveData.endDate} onChange={(e) => setLeaveData({...leaveData, endDate: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Reason for Leave</label>
+            <textarea required value={leaveData.reason} onChange={(e) => setLeaveData({...leaveData, reason: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50 h-24 resize-none" placeholder="Explain why you need leave..." />
+          </div>
+          <button type="submit" className="w-full bg-primary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">Submit Request</button>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
 /* ── Main ─────────────────────────────────────────────────── */
 const StudentDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -599,6 +887,7 @@ const StudentDashboard = () => {
     projects: <ProjectsView user={user} />,
     roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} />,
     attendance: <MyAttendanceView user={user} />,
+    pending: <MyPendingView user={user} />,
     certificates: <CertificatesView user={user} certificates={certificates} />,
     support:  <SupportView />,
   };

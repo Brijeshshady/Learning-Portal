@@ -1,4 +1,4 @@
-import { getState, addUser } from './store';
+import { getState, addUser, addCertificate } from './store';
 
 const API_BASE = '/api'; 
 
@@ -9,11 +9,6 @@ const getAuthHeaders = () => {
     'Authorization': token ? `Bearer ${token}` : ''
   };
 };
-
-const demoCertificates = [
-  { id: 'CERT-A1B2-C3D4', studentId: 'USR-004', studentName: 'Arun Kumar', schoolId: 'HUB-CH-01', title: 'AI Innovation Lab - Beginner', issuedBy: 'Super Admin', date: '2026-05-01' },
-  { id: 'CERT-X9Y8-Z7W6', studentId: 'USR-005', studentName: 'Priya Selvi', schoolId: 'HUB-CH-01', title: 'Robotics Foundation', issuedBy: 'Hub Admin', date: '2026-04-15' },
-];
 
 const dashboardStats = {
   student: {
@@ -229,7 +224,7 @@ const DB = {
     } catch { /* fall through */ }
     
     // Filter demo fallback
-    let result = [...demoCertificates];
+    let result = [...(getState().certificates || [])];
     if (filters.studentId) result = result.filter(c => c.studentId === filters.studentId);
     if (filters.schoolId)  result = result.filter(c => c.schoolId === filters.schoolId);
     return result.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -263,7 +258,7 @@ const DB = {
       date: new Date().toISOString().split('T')[0]
     };
     
-    demoCertificates.unshift(cert);
+    addCertificate(cert);
     return cert;
   },
 

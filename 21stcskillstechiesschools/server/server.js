@@ -9,6 +9,7 @@ const User = require('./models/User');
 const School = require('./models/School');
 const Token = require('./models/Token');
 const Progress = require('./models/Progress');
+const Certificate = require('./models/Certificate');
 const aiManager = require('./services/aiManager');
 
 const app = express();
@@ -29,13 +30,13 @@ const protect = async (req, res, next) => {
             const decoded = jwt.verify(token, JWT_SECRET);
             req.user = await User.findOne({ id: decoded.id }).select('-password');
             if (!req.user) return res.status(401).json({ error: 'User no longer exists' });
-            next();
+            return next();
         } catch (error) {
-            res.status(401).json({ error: 'Not authorized, token failed' });
+            return res.status(401).json({ error: 'Not authorized, token failed' });
         }
     }
     if (!token) {
-        res.status(401).json({ error: 'Not authorized, no token' });
+        return res.status(401).json({ error: 'Not authorized, no token' });
     }
 };
 
@@ -70,14 +71,14 @@ async function seedDatabase() {
         }
 
         const users = [
-            { id: 'u1', email: 'superadmin@21stc.com', password: 'password123', role: 'admin', name: 'Super Admin', schoolId: 'global' },
-            { id: 'u2', email: 'hubadmin@21stc.com', password: 'password123', role: 'school-admin', name: 'Chennai Hub Admin', schoolId: 'HUB-CH-01' },
+            { id: 'u0', email: 'superadmin@21stc.com', password: 'password123', role: 'admin', name: 'Super Admin', schoolId: null },
+            { id: 'u5', email: 'hubadmin@21stc.com', password: 'password123', role: 'school-admin', name: 'Chennai Hub Admin', schoolId: 'HUB-CH-01' },
             { id: 'u3', email: 'teacher@21stc.com', password: 'password123', role: 'teacher', name: 'Ms. Kavitha', schoolId: 'HUB-CH-01', grades: [6, 7] },
             { id: 'u4', email: 'student@21stc.com', password: 'password123', role: 'student', name: 'Arun Kumar', schoolId: 'HUB-CH-01', grade: 7 }
         ];
         
         for (const u of users) {
-            const exists = await User.findOne({ id: u.id });
+            const exists = await User.findOne({ email: u.email });
             if (!exists) {
                 await User.create(u);
             } else {
@@ -110,7 +111,8 @@ async function seedDatabase() {
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+        // Case-insensitive exact match
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
         
         if (user && (await user.matchPassword(password))) {
             const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
@@ -153,6 +155,46 @@ app.get('/api/users/:email', protect, async (req, res) => {
         const user = await User.findOne({ email: req.params.email }).select('-password');
         if (!user) return res.status(404).json({ error: 'User not found' });
         res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Certificates
+app.get('/api/certificates', protect, async (req, res) => {
+    try {
+        const { schoolId, studentId } = req.query;
+        let filter = {};
+        if (schoolId) filter.schoolId = schoolId;
+        if (studentId) filter.studentId = studentId;
+        const certs = await Certificate.find(filter).sort({ date: -1 });
+        res.json(certs);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/certificates', protect, async (req, res) => {
+    try {
+        const { studentId, title, issuedBy, schoolId } = req.body;
+        
+        const generateBlock = () => Math.random().toString(36).substring(2, 6).toUpperCase().padStart(4, '0');
+        const certId = `CERT-${generateBlock()}-${generateBlock()}`;
+        
+        const student = await User.findOne({ id: studentId });
+        const studentName = student ? student.name : 'Unknown Student';
+
+        const cert = await Certificate.create({
+            id: certId,
+            studentId,
+            studentName,
+            schoolId: schoolId || (student ? student.schoolId : 'HUB-CH-01'),
+            title,
+            issuedBy,
+            date: new Date().toISOString().split('T')[0]
+        });
+        
+        res.status(201).json(cert);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

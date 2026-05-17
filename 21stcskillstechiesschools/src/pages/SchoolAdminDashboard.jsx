@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin } from 'lucide-react';
+import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin, Clock, ThumbsUp, ThumbsDown, Inbox, ClipboardList } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import { getHubData } from '../lib/mapping';
 import useStore from '../hooks/useStore';
-import { addUser, removeUser, updateUser, exportCSV, addNotification, teacherCheckIn, teacherCheckOut, markAttendance, updateLeaveStatus } from '../lib/store';
+import { addUser, removeUser, updateUser, exportCSV, addNotification, markAttendance, updateLeaveStatus, submitGrade, submitAssignment } from '../lib/store';
 import Modal from '../components/Modal';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -184,11 +184,18 @@ const UsersView = () => {
 };
 
 /* ── Analytics ────────────────────────────────────────────── */
+const termTrend = [
+  { name: 'Month 1', pct: 45 }, { name: 'Month 2', pct: 60 }, { name: 'Month 3', pct: 72 }, { name: 'Month 4', pct: 88 }
+];
+const gradeBar = [
+  { name: 'Grade 6', score: 85 }, { name: 'Grade 7', score: 72 }, { name: 'Grade 8', score: 65 }, { name: 'Grade 9', score: 90 }
+];
+
 const AnalyticsView = () => (
   <div>
     <div className="flex items-end justify-between mb-6">
       <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Institution Reports</h2><p className="text-zinc-500 text-sm mt-1">Performance and engagement analytics for this hub.</p></div>
-      <button onClick={() => window.print()} className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all print:hidden"><Download className="w-3.5 h-3.5" /> Export PDF</button>
+      <button onClick={() => addNotification({ title: 'Downloading...', body: 'Analytics_Report.pdf is generating.', type: 'info' })} className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all print:hidden"><Download className="w-3.5 h-3.5" /> Export PDF</button>
     </div>
     <KpiGrid>
       <KpiCard label="Avg Completion"  value="76%"   change="+6%"  icon={Activity}  iconBg="bg-primary/15"    iconColor="text-primary"     delay={0} />
@@ -306,101 +313,38 @@ const CertificatesView = () => {
 const SchoolAttendanceView = () => {
   const { users, attendance = [], teacherAttendance = [], leaves = [] } = useStore();
   const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [activeTab, setActiveTab] = useState('students'); // 'students', 'teachers', 'leaves'
-  const [workMode, setWorkMode] = useState('onsite');
-  const [isLocating, setIsLocating] = useState(false);
+  const d = new Date();
+  const todayLocal = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const [selectedDate, setSelectedDate] = useState(todayLocal);
+  const [activeTab, setActiveTab] = useState('teachers'); // 'teachers', 'students', 'leaves'
 
   const students = users.filter(u => u.role === 'student' && u.schoolId === user?.schoolId);
   const teachers = users.filter(u => u.role === 'teacher' && u.schoolId === user?.schoolId);
-  
-  const currentRecords = attendance.filter(a => a.date === selectedDate);
-  const currentTeacherRecords = teacherAttendance.filter(a => a.date === selectedDate);
-  
-  const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === new Date().toISOString().split('T')[0]);
-  const leaveRequests = leaves.filter(l => l.status === 'pending');
 
-  const handleSelfCheckIn = async () => {
-    if (workMode === 'remote') {
-      teacherCheckIn(user.id, 'remote');
-      return;
-    }
+  const currentRecords = attendance.filter(a => a.date === selectedDate && students.some(s => s.id === a.studentId));
+  const currentTeacherRecords = teacherAttendance.filter(a => a.date === selectedDate && teachers.some(t => t.id === a.teacherId));
+  const leaveRequests = leaves.filter(l => l.status === 'pending' && (students.some(s => s.id === l.studentId) || teachers.some(t => t.id === l.teacherId)));
 
-    setIsLocating(true);
-    if (!navigator.geolocation) {
-      addNotification({ title: 'Error', body: 'Geolocation not supported', type: 'error' });
-      setIsLocating(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        try {
-          teacherCheckIn(user.id, 'onsite', coords);
-        } catch (err) {
-          if (err.message === 'NOT_IN_HUB_LOCATION') {
-            alert('Not in hub location. Go to the hub to mark attendance.');
-          } else {
-            addNotification({ title: 'Error', body: err.message, type: 'error' });
-          }
-        }
-        setIsLocating(false);
-      },
-      () => {
-        addNotification({ title: 'Error', body: 'Location access required for on-site.', type: 'error' });
-        setIsLocating(false);
-      }
-    );
-  };
+  // Teacher mode KPIs
+  const onSiteCount  = currentTeacherRecords.filter(a => a.mode === 'onsite').length;
+  const remoteCount  = currentTeacherRecords.filter(a => a.mode === 'remote').length;
+  const notCheckedIn = teachers.filter(t => !currentTeacherRecords.find(a => a.teacherId === t.id)).length;
 
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Hub Attendance</h2>
-          <p className="text-zinc-500 text-sm mt-1">Attendance monitoring for your institution.</p>
+          <p className="text-zinc-500 text-sm mt-1">Monitor teacher on-site/remote check-ins and student attendance.</p>
         </div>
-        <div className="flex items-center gap-4">
-          {!myRecord && (
-            <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-              <button 
-                onClick={() => setWorkMode('onsite')}
-                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${workMode === 'onsite' ? 'bg-emerald-500 text-white' : 'text-zinc-500 hover:text-white'}`}
-              >
-                <MapPin className="w-3 h-3" /> On-Site
-              </button>
-              <button 
-                onClick={() => setWorkMode('remote')}
-                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${workMode === 'remote' ? 'bg-amber-500 text-white' : 'text-zinc-500 hover:text-white'}`}
-              >
-                <Activity className="w-3 h-3" /> Remote
-              </button>
-            </div>
-          )}
-          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-2 px-4 flex items-center gap-4">
-             <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Self Check-In {myRecord && `(${myRecord.mode})`}: <span className="text-white ml-2">{myRecord?.checkIn || '--:--'}</span></p>
-             {!myRecord ? (
-                <button 
-                  disabled={isLocating}
-                  onClick={handleSelfCheckIn} 
-                  className="bg-emerald-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 disabled:opacity-50"
-                >
-                  {isLocating ? '...' : 'In'}
-                </button>
-             ) : !myRecord.checkOut ? (
-                <button onClick={() => teacherCheckOut(user.id)} className="bg-amber-500 text-white px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-amber-600">Out</button>
-             ) : null}
-          </div>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-            <input 
-              type="date" 
-              value={selectedDate} 
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50"
-            />
-          </div>
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500/50"
+          />
         </div>
       </div>
 
@@ -461,36 +405,99 @@ const SchoolAttendanceView = () => {
       )}
 
       {activeTab === 'teachers' && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="border-b border-zinc-800">
-              <tr>{['Teacher', 'Check-In', 'Check-Out', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {teachers.map((t) => {
-                const record = currentTeacherRecords.find(a => a.teacherId === t.id);
-                return (
-                  <tr key={t.id} className="hover:bg-white/[0.01]">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">{t.name[0]}</div>
-                        <p className="text-sm font-bold text-white">{t.name}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkIn || '--:--'}</td>
-                    <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkOut || '--:--'}</td>
-                    <td className="px-6 py-4">
-                      {record ? (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">On Duty</span>
-                      ) : (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Off Duty</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {/* KPI summary */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-white">{onSiteCount}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500/70">On-Site</p>
+              </div>
+            </div>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
+                <Activity className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-white">{remoteCount}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-500/70">Remote / WFH</p>
+              </div>
+            </div>
+            <div className="bg-zinc-800 border border-zinc-700 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-zinc-700 rounded-xl flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5 text-zinc-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-white">{notCheckedIn}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Not Checked In</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Teacher table */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+              <p className="text-sm font-black text-white">Teacher Check-In Logs</p>
+              <p className="text-xs text-zinc-500">{selectedDate}</p>
+            </div>
+            <table className="w-full text-left">
+              <thead className="border-b border-zinc-800">
+                <tr>{['Teacher', 'Mode', 'Check-In', 'Check-Out', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {teachers.length === 0 ? (
+                  <tr><td colSpan="5" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No teachers in this hub.</td></tr>
+                ) : (
+                  teachers.map((t) => {
+                    const record = currentTeacherRecords.find(a => a.teacherId === t.id);
+                    const mode = record?.mode;
+                    return (
+                      <tr key={t.id} className="hover:bg-white/[0.01] transition-all">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">{t.name[0]}</div>
+                            <div>
+                              <p className="text-sm font-bold text-white">{t.name}</p>
+                              <p className="text-[9px] text-zinc-500">{t.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {mode === 'onsite' && (
+                            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                              <MapPin className="w-2.5 h-2.5" /> On-Site
+                            </span>
+                          )}
+                          {mode === 'remote' && (
+                            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                              <Activity className="w-2.5 h-2.5" /> Remote
+                            </span>
+                          )}
+                          {!mode && <span className="text-zinc-600 text-[9px] font-bold">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkIn || '--:--'}</td>
+                        <td className="px-6 py-4 text-xs font-bold text-zinc-400">{record?.checkOut || '--:--'}</td>
+                        <td className="px-6 py-4">
+                          {record?.checkOut ? (
+                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Completed</span>
+                          ) : record ? (
+                            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md flex items-center gap-1 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> On Duty
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800/60 border border-zinc-700/50 px-2.5 py-1 rounded-md">Not Checked In</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -527,13 +534,288 @@ const SchoolAttendanceView = () => {
   );
 };
 
+/* ── Hub Pending View ────────────────────────────────── */
+const HubPendingView = () => {
+  const { user } = useAuth();
+  const { users, submissions = [], grades = {}, leaves = [] } = useStore();
+  const [activeTab, setActiveTab] = useState('leaves');
+  const [expandedId, setExpandedId] = useState(null);
+  const [activeGrade, setActiveGrade] = useState({});
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formData, setFormData] = useState({ studentId: '', week: 1, title: '', link: '', notes: '' });
+
+  const hubStudents = users.filter(u => u.schoolId === user?.schoolId && u.role === 'student');
+
+  // Filter to this hub's data
+  const hubLeaves   = leaves.filter(l => !l.schoolId || l.schoolId === user?.schoolId);
+  const hubSubs     = submissions; // all subs visible to hub admin
+  const pendingLeaves  = hubLeaves.filter(l => l.status === 'pending');
+  const resolvedLeaves = hubLeaves.filter(l => l.status !== 'pending');
+  const pendingSubs = hubSubs.filter(s => !grades[s.id]);
+  const gradedSubs  = hubSubs.filter(s =>  grades[s.id]);
+
+  const handleGradeSubmit = (id) => {
+    if (!activeGrade[id]) return;
+    submitGrade(id, activeGrade[id]);
+    setExpandedId(null);
+    setActiveGrade(prev => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  const handleLeaveAction = (id, status, studentName) => {
+    updateLeaveStatus(id, status, user?.name);
+    addNotification({
+      title: `Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+      body: `${studentName}'s leave has been ${status}.`,
+      type: status === 'approved' ? 'success' : 'warning'
+    });
+  };
+
+  const handleCreateSubmit = (e) => {
+    e.preventDefault();
+    const student = hubStudents.find(s => s.id === formData.studentId);
+    if (!student) return;
+    
+    submitAssignment({
+      studentId: student.id,
+      studentName: student.name,
+      week: Number(formData.week),
+      title: formData.title,
+      content: formData.link || formData.notes ? `Link: ${formData.link}\nNotes: ${formData.notes}` : 'Offline Submission'
+    });
+    
+    addNotification({ title: 'Submission Created', body: `Recorded for ${student.name}`, type: 'success' });
+    setShowCreateModal(false);
+    setFormData({ studentId: '', week: 1, title: '', link: '', notes: '' });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Hub Pending Actions</h2>
+        <p className="text-zinc-500 text-sm mt-1">Hub-wide pending leave requests and ungraded submissions.</p>
+      </div>
+
+      {/* KPI row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-red-500/70 mb-2">Pending Leaves</p>
+          <p className="text-3xl font-black text-white">{pendingLeaves.length}</p>
+        </div>
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-amber-500/70 mb-2">Ungraded Subs</p>
+          <p className="text-3xl font-black text-white">{pendingSubs.length}</p>
+        </div>
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500/70 mb-2">Leaves Resolved</p>
+          <p className="text-3xl font-black text-white">{resolvedLeaves.length}</p>
+        </div>
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-blue-500/70 mb-2">Graded Subs</p>
+          <p className="text-3xl font-black text-white">{gradedSubs.length}</p>
+        </div>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-2xl border border-zinc-800 w-fit">
+        <button
+          onClick={() => setActiveTab('leaves')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'leaves' ? 'bg-emerald-500 text-white shadow-lg' : 'text-zinc-500 hover:text-white'
+          }`}
+        >
+          <Calendar className="w-3.5 h-3.5" /> Leave Requests
+          {pendingLeaves.length > 0 && <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">{pendingLeaves.length}</span>}
+        </button>
+        <button
+          onClick={() => setActiveTab('submissions')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'submissions' ? 'bg-emerald-500 text-white shadow-lg' : 'text-zinc-500 hover:text-white'
+          }`}
+        >
+          <ClipboardList className="w-3.5 h-3.5" /> Submissions
+          {pendingSubs.length > 0 && <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center">{pendingSubs.length}</span>}
+        </button>
+      </div>
+
+      {/* Leave requests tab */}
+      {activeTab === 'leaves' && (
+        <div className="space-y-3">
+          {pendingLeaves.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-16 flex flex-col items-center gap-4">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+              <p className="text-white font-black">No pending leave requests</p>
+              <p className="text-zinc-500 text-sm">All student leaves have been processed.</p>
+            </div>
+          ) : (
+            pendingLeaves.map(leave => (
+              <motion.div key={leave.id} layout className="bg-zinc-900 border border-amber-500/20 rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-11 h-11 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 font-black text-sm shrink-0">
+                      {leave.studentName?.[0] ?? '?'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-black text-white">{leave.studentName ?? 'Student'}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{leave.startDate} → {leave.endDate}</p>
+                      <div className="mt-3 bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-3">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Reason</p>
+                        <p className="text-sm text-zinc-300">{leave.reason}</p>
+                      </div>
+                      <p className="text-[9px] text-zinc-600 mt-2">
+                        Applied: {leave.appliedAt ? new Date(leave.appliedAt).toLocaleDateString() : 'Unknown'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                      onClick={() => handleLeaveAction(leave.id, 'approved', leave.studentName)}
+                      className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" /> Approve
+                    </button>
+                    <button
+                      onClick={() => handleLeaveAction(leave.id, 'rejected', leave.studentName)}
+                      className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ))
+          )}
+          {/* Resolved */}
+          {resolvedLeaves.length > 0 && (
+            <div className="mt-6">
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600 mb-3 px-1">Resolved</p>
+              <div className="space-y-2">
+                {resolvedLeaves.slice(0, 5).map(l => (
+                  <div key={l.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 font-black text-xs">{l.studentName?.[0] ?? '?'}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-white">{l.studentName}</p>
+                      <p className="text-xs text-zinc-500">{l.startDate} → {l.endDate}</p>
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${
+                      l.status === 'approved' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'
+                    }`}>{l.status}</span>
+                    {l.reviewedBy && <span className="text-[9px] text-zinc-600">by {l.reviewedBy}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Submissions tab */}
+      {activeTab === 'submissions' && (
+        <div className="space-y-3">
+          <div className="flex justify-end mb-2">
+            <button onClick={() => setShowCreateModal(true)} className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"><PlusCircle className="w-3.5 h-3.5" /> Create Submission</button>
+          </div>
+          {pendingSubs.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-16 flex flex-col items-center gap-4">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+              <p className="text-white font-black">All submissions graded!</p>
+            </div>
+          ) : (
+            pendingSubs.map(s => (
+              <motion.div key={s.id} layout className="bg-zinc-900 border border-amber-500/20 rounded-2xl overflow-hidden">
+                <button
+                  onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}
+                  className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all"
+                >
+                  <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-400 font-black text-sm shrink-0">{(s.studentName || 'S')[0]}</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-white">{s.studentName}</p>
+                    <p className="text-xs text-zinc-500">Week {s.week}: {s.title}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" /> Pending
+                    </span>
+                  </div>
+                </button>
+                <AnimatePresence>
+                  {expandedId === s.id && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-zinc-800">
+                      <div className="p-6 space-y-4">
+                        <div className="bg-zinc-800/60 rounded-xl p-4">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Content</p>
+                          <p className="text-sm text-zinc-300">{s.content || 'No content.'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Assign Grade</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {['A+', 'A', 'B+', 'B', 'C+', 'C', 'D'].map(g => (
+                              <button key={g} onClick={() => setActiveGrade(prev => ({ ...prev, [s.id]: g }))}
+                                className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
+                                  activeGrade[s.id] === g ? 'bg-emerald-500 text-white scale-105' : 'bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700'
+                                }`}>{g}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <button onClick={() => handleGradeSubmit(s.id)} disabled={!activeGrade[s.id]}
+                            className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                              activeGrade[s.id] ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                            }`}>
+                            <CheckCircle2 className="w-4 h-4" />{activeGrade[s.id] ? `Submit Grade: ${activeGrade[s.id]}` : 'Select a Grade First'}
+                          </button>
+                          <button onClick={() => setExpandedId(null)} className="px-5 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white transition-all">Cancel</button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))
+          )}
+        </div>
+      )}
+
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Record Submission">
+        <form onSubmit={handleCreateSubmit} className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Student</label>
+            <select required value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50">
+              <option value="" disabled>Select a student...</option>
+              {hubStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Week Number</label>
+              <input required type="number" min="1" max="36" value={formData.week} onChange={(e) => setFormData({...formData, week: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Title</label>
+              <input required type="text" placeholder="e.g. AI Model" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Link (Optional)</label>
+            <input type="url" placeholder="https://..." value={formData.link} onChange={(e) => setFormData({...formData, link: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Notes / Context (Optional)</label>
+            <textarea placeholder="Any additional context..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 h-20 resize-none" />
+          </div>
+          <button type="submit" className="w-full bg-emerald-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20">Submit on behalf of Student</button>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
 /* ── Main ─────────────────────────────────────────────────── */
 const SchoolAdminDashboard = () => {
   const [searchParams] = useSearchParams();
   const [schoolData, setSchoolData] = useState(null);
   const [stats, setStats] = useState(null);
   const { user } = useAuth();
-  const activeView = searchParams.get('v') || 'dashboard';
+  const activeView = searchParams.get('v') || 'overview';
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -562,12 +844,13 @@ const SchoolAdminDashboard = () => {
     users:        <UsersView />, 
     analytics:    <AnalyticsView />, 
     attendance:   <SchoolAttendanceView />,
+    pending:      <HubPendingView />,
     certificates: <CertificatesView /> 
   };
   return (
     <AnimatePresence mode="wait">
       <motion.div key={activeView} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-        {views[activeView] || views.dashboard}
+        {views[activeView] || views.overview}
       </motion.div>
     </AnimatePresence>
   );

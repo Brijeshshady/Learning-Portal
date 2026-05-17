@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     role: { type: String, enum: ['admin', 'school-admin', 'teacher', 'student'], required: true },
     name: { type: String, required: true },
-    schoolId: { type: String, required: true },
+    schoolId: { type: String },
     grades: [{ type: Number }], // For teachers
     grade: { type: Number },    // For students
     createdAt: { type: Date, default: Date.now }

@@ -30,9 +30,10 @@ const Register = () => {
   const completeRegistration = (role, code = null) => {
     setLoading(true);
     
+    let newUserId = `u${Date.now()}`;
     // Add to global store for persistence and admin visibility
     try {
-      addUser({
+      const newUser = addUser({
         name: `${formData.firstName} ${formData.lastName}`.trim() || 'New User',
         email: formData.email,
         password: formData.password, // Store for demo purposes
@@ -41,15 +42,18 @@ const Register = () => {
         grade: 6, // Default grade
         status: 'active'
       });
+      if (newUser && newUser.id) newUserId = newUser.id;
     } catch (e) {
       console.warn('Store not available for registration persistence', e);
     }
 
     // Persist session
     localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('userId',     newUserId);
     localStorage.setItem('userRole',   role);
     localStorage.setItem('userName',   `${formData.firstName} ${formData.lastName}`.trim() || 'New User');
     localStorage.setItem('userEmail',  formData.email);
+    localStorage.setItem('userToken',  `local_${Date.now()}`);
     if (code) localStorage.setItem('schoolCode', code);
 
     // Hard navigate to force AuthContext re-hydration

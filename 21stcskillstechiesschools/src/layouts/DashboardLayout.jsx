@@ -25,6 +25,7 @@ const VIEW_TITLES = {
     overview:  'Institution Overview',
     users:     'Manage Users',
     attendance:'Hub Attendance',
+    pending:   'Hub Pending Actions',
     certificates: 'Hub Certificates',
     analytics: 'Institution Reports',
   },
@@ -32,6 +33,7 @@ const VIEW_TITLES = {
     overview:    'Class Overview',
     students:    'Student Roster',
     attendance:  'Attendance Log',
+    pending:     'Pending Inbox',
     submissions: 'Grade Management',
     certificates: 'Issue Certificates',
     curriculum:  'Syllabus View',
@@ -41,6 +43,7 @@ const VIEW_TITLES = {
     'ai-lab': 'AI Innovation Lab',
     projects: 'My Projects',
     attendance: 'My Attendance',
+    pending: 'My Pending',
     roadmap:  '36-Week Roadmap',
     certificates: 'My Certificates',
     support:  'Support Center',
@@ -61,7 +64,12 @@ const DashboardLayout = () => {
   const [showSettings, setShowSettings] = React.useState(false);
   const { notifications, maintenanceMode, hubs = [] } = useStore();
   
-  const myNotifications = notifications.filter(n => !n.targetUser || n.targetUser === user?.id);
+  const myNotifications = notifications.filter(n => {
+    if (!n.targetUser && !n.targetRole) return true; // global
+    if (n.targetUser && n.targetUser === user?.id) return true; // user-specific
+    if (n.targetRole && n.targetRole === user?.role) return true; // role-specific
+    return false;
+  });
   const unreadCount = myNotifications.filter(n => !n.read).length;
 
   const role      = user?.role || 'student';

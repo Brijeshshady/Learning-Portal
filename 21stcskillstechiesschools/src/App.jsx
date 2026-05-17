@@ -49,9 +49,9 @@ function AppRoutes() {
       <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-      <Route path="/about"   element={<ComingSoon title="About Us" />} />
-      <Route path="/contact" element={<ComingSoon title="Contact" />} />
-      <Route path="/privacy" element={<ComingSoon title="Privacy Policy" />} />
+      <Route path="/about"   element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* ── Protected Dashboard Shell ─────────────────────────────────────── */}
       <Route element={<DashboardLayout />}>
@@ -77,15 +77,44 @@ const DashboardRedirect = () => {
   return <Navigate to={user ? (ROLE_ROUTES[user.role] || '/login') : '/login'} replace />;
 };
 
-// Placeholder for unbuilt pages
-const ComingSoon = ({ title }) => (
-  <div className="min-h-screen bg-background flex items-center justify-center">
-    <div className="text-center space-y-4">
-      <h1 className="text-4xl font-black font-headline text-white">{title}</h1>
-      <p className="text-zinc-500 font-medium">This page is coming soon.</p>
-      <a href="/" className="inline-block mt-4 text-primary font-black uppercase tracking-widest text-xs hover:underline">← Back Home</a>
+// Generic static page template
+const StaticPage = ({ title, children }) => (
+  <div className="min-h-screen bg-background text-white p-8 md:p-16">
+    <div className="max-w-3xl mx-auto space-y-8">
+      <h1 className="text-4xl md:text-5xl font-black font-headline">{title}</h1>
+      <div className="text-zinc-400 space-y-6 font-medium leading-relaxed">
+        {children}
+      </div>
+      <div className="pt-12 border-t border-zinc-800">
+        <a href="/" className="inline-block text-primary font-black uppercase tracking-widest text-xs hover:underline">← Back to Home</a>
+      </div>
     </div>
   </div>
+);
+
+const AboutPage = () => (
+  <StaticPage title="About 21st Century Skills">
+    <p>We are dedicated to equipping students with the tools they need for the future. Through our AI Innovation Labs, we bring hands-on AI, Machine Learning, and Robotics education directly to school campuses.</p>
+    <p>Our mission is to bridge the gap between traditional education and the rapidly evolving tech landscape, empowering the next generation of innovators and thinkers.</p>
+  </StaticPage>
+);
+
+const ContactPage = () => (
+  <StaticPage title="Contact Us">
+    <p>Have questions about our programs or want to bring a lab to your school? We'd love to hear from you.</p>
+    <ul className="space-y-2 mt-4">
+      <li><strong>Email:</strong> support@21stcskills.com</li>
+      <li><strong>Phone:</strong> +1 (555) 123-4567</li>
+      <li><strong>HQ:</strong> Innovation Drive, Tech District</li>
+    </ul>
+  </StaticPage>
+);
+
+const PrivacyPage = () => (
+  <StaticPage title="Privacy Policy">
+    <p>Your privacy is our top priority. We collect only the necessary information to provide a seamless learning experience.</p>
+    <p>Student data is strictly protected and never shared with third parties for marketing purposes. All educational records comply with standard data protection regulations.</p>
+  </StaticPage>
 );
 
 function App() {

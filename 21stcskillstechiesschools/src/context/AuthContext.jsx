@@ -23,6 +23,11 @@ export const AuthProvider = ({ children }) => {
       const exists = storeUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
       
       if (exists) {
+        let grades = exists.grades;
+        const storedGrades = localStorage.getItem('userGrades');
+        if (storedGrades) {
+          try { grades = JSON.parse(storedGrades); } catch (e) {}
+        }
         setUser({
           id:       localStorage.getItem('userId') || exists.id,
           name:     localStorage.getItem('userName')  || exists.name,
@@ -30,15 +35,16 @@ export const AuthProvider = ({ children }) => {
           role:     role,
           token:    token,
           schoolId: localStorage.getItem('schoolCode') || exists.schoolId,
+          grades:   grades || [],
         });
       } else {
         // User no longer in system, purge session
-        ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode'].forEach(k => localStorage.removeItem(k));
+        ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode', 'userGrades'].forEach(k => localStorage.removeItem(k));
         setUser(null);
       }
     } else if (isLoggedIn || role || email || token) {
       // Clear corrupted/partial session data
-      ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode'].forEach(k => localStorage.removeItem(k));
+      ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode', 'userGrades'].forEach(k => localStorage.removeItem(k));
     }
     setLoading(false);
   }, []);
@@ -58,6 +64,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userEmail',  dbUser.email);
     localStorage.setItem('userToken',  dbUser.token);
     if (dbUser.schoolId) localStorage.setItem('schoolCode', dbUser.schoolId);
+    if (dbUser.grades) localStorage.setItem('userGrades', JSON.stringify(dbUser.grades));
 
     const sessionUser = {
       id:       dbUser.id,
@@ -66,6 +73,7 @@ export const AuthProvider = ({ children }) => {
       role:     dbUser.role,
       token:    dbUser.token,
       schoolId: dbUser.schoolId || null,
+      grades:   dbUser.grades || [],
     };
     setUser(sessionUser);
     return sessionUser;
@@ -84,7 +92,7 @@ export const AuthProvider = ({ children }) => {
   // ── Logout ──────────────────────────────────────────────────────────────────
   const logout = useCallback(() => {
     // Remove only auth-related keys, preserve platform state
-    ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode'].forEach(k => localStorage.removeItem(k));
+    ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode', 'userGrades'].forEach(k => localStorage.removeItem(k));
     setUser(null);
     // Hard navigate so the entire app re-mounts cleanly
     window.location.replace('/login');

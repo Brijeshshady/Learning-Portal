@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -9,7 +9,7 @@ import {
   AreaChartCard, BarChartCard, ActivityFeed, SectionCard,
 } from '../components/DashboardShell';
 import useStore from '../hooks/useStore';
-import { submitGrade, exportCSV, addNotification, markAttendance, teacherCheckIn, teacherCheckOut, updateLeaveStatus } from '../lib/store';
+import { submitGrade, submitAssignment, exportCSV, addNotification, markAttendance, teacherCheckIn, teacherCheckOut, updateLeaveStatus } from '../lib/store';
 import Modal from '../components/Modal';
 
 
@@ -82,9 +82,11 @@ const StudentsView = ({ students }) => {
 };
 
 /* ── Submissions ──────────────────────────────────────────── */
-const SubmissionsView = () => {
+const SubmissionsView = ({ students = [] }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [activeGrade, setActiveGrade] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formData, setFormData] = useState({ studentId: '', week: 1, title: '', link: '', notes: '' });
   const { submissions, grades } = useStore();
   const { user } = useAuth();
 
@@ -110,11 +112,32 @@ const SubmissionsView = () => {
     setActiveGrade('');
   };
 
+  const handleCreateSubmit = (e) => {
+    e.preventDefault();
+    const student = students.find(s => s.id === formData.studentId);
+    if (!student) return;
+    
+    submitAssignment({
+      studentId: student.id,
+      studentName: student.name,
+      week: Number(formData.week),
+      title: formData.title,
+      content: formData.link || formData.notes ? `Link: ${formData.link}\nNotes: ${formData.notes}` : 'Offline Submission'
+    });
+    
+    addNotification({ title: 'Submission Created', body: `Recorded for ${student.name}`, type: 'success' });
+    setShowCreateModal(false);
+    setFormData({ studentId: '', week: 1, title: '', link: '', notes: '' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between">
         <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Submissions & Grading</h2><p className="text-zinc-500 text-sm mt-1">{subs.filter(s => s.status === 'pending').length} awaiting review.</p></div>
-        <button onClick={handleExport} className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all"><Download className="w-3.5 h-3.5" /> Export</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowCreateModal(true)} className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"><PlusCircle className="w-3.5 h-3.5" /> Create</button>
+          <button onClick={handleExport} className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all"><Download className="w-3.5 h-3.5" /> Export</button>
+        </div>
       </div>
       <div className="space-y-3">
         {subs.map((s) => (
@@ -148,6 +171,37 @@ const SubmissionsView = () => {
           </div>
         ))}
       </div>
+
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Record Submission">
+        <form onSubmit={handleCreateSubmit} className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Student</label>
+            <select required value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50">
+              <option value="" disabled>Select a student...</option>
+              {students.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Week Number</label>
+              <input required type="number" min="1" max="36" value={formData.week} onChange={(e) => setFormData({...formData, week: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Title</label>
+              <input required type="text" placeholder="e.g. AI Model" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Link (Optional)</label>
+            <input type="url" placeholder="https://..." value={formData.link} onChange={(e) => setFormData({...formData, link: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Notes / Context (Optional)</label>
+            <textarea placeholder="Any additional context..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 h-20 resize-none" />
+          </div>
+          <button type="submit" className="w-full bg-emerald-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20">Submit on behalf of Student</button>
+        </form>
+      </Modal>
     </div>
   );
 };
@@ -166,7 +220,7 @@ const CurriculumView = () => (
           <span className={`text-[9px] font-black uppercase tracking-widest ${t.textClass} block mb-1`}>{t.term} · Weeks {t.weeks}</span>
           <h3 className="text-lg font-black font-headline text-white mb-4">{t.theme}</h3>
           <div className="space-y-2">{t.topics.map((topic) => <div key={topic} className="flex items-center gap-2 text-sm font-medium text-zinc-400"><span className={`w-1.5 h-1.5 rounded-full ${t.textClass.replace('text', 'bg')}`}></span>{topic}</div>)}</div>
-          <button className={`w-full mt-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${t.borderClass} ${t.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}><FileText className="w-3.5 h-3.5" /> Full Syllabus</button>
+          <button onClick={() => addNotification({ title: 'Syllabus Downloaded', body: 'The full syllabus PDF has been saved.', type: 'success' })} className={`w-full mt-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${t.borderClass} ${t.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}><FileText className="w-3.5 h-3.5" /> Full Syllabus</button>
         </SectionCard>
       ))}
     </div>
@@ -419,8 +473,30 @@ const PendingView = () => {
                       <div className="p-6 space-y-5">
                         {/* Submission content */}
                         <div className="bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-4">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Submission Content</p>
-                          <p className="text-sm text-zinc-300 leading-relaxed">{s.content || 'No content provided.'}</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Submission Details</p>
+                          {(() => {
+                            const linkMatch = s.content?.match(/Link:\s*(.*)/);
+                            const notesMatch = s.content?.match(/Notes:\s*([\s\S]*)/);
+                            if (linkMatch || notesMatch) {
+                              return (
+                                <div className="space-y-3">
+                                  {linkMatch && linkMatch[1] && (
+                                    <div>
+                                      <span className="text-[10px] font-bold text-zinc-500 mr-2">Link:</span>
+                                      <a href={linkMatch[1]} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-400 hover:underline">{linkMatch[1]}</a>
+                                    </div>
+                                  )}
+                                  {notesMatch && notesMatch[1] && (
+                                    <div>
+                                      <span className="text-[10px] font-bold text-zinc-500 block mb-1">Notes:</span>
+                                      <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{notesMatch[1]}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{s.content || 'No content provided.'}</p>;
+                          })()}
                         </div>
 
                         {/* Grade picker */}
@@ -592,7 +668,11 @@ const AttendanceView = ({ students }) => {
 
   const handleTeacherCheckIn = async () => {
     if (workMode === 'remote') {
-      teacherCheckIn(user.id, 'remote');
+      try {
+        teacherCheckIn(user.id, 'remote');
+      } catch (err) {
+        addNotification({ title: 'Check-In Failed', body: err.message, type: 'error' });
+      }
       return;
     }
 
@@ -624,7 +704,17 @@ const AttendanceView = ({ students }) => {
     );
   };
 
-  const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === new Date().toISOString().split('T')[0]);
+  const handleTeacherCheckOut = () => {
+    try {
+      teacherCheckOut(user.id);
+    } catch (err) {
+      addNotification({ title: 'Check-Out Failed', body: err.message, type: 'error' });
+    }
+  };
+
+  const d = new Date();
+  const todayLocal = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const myRecord = teacherAttendance.find(a => a.teacherId === user?.id && a.date === todayLocal);
   const pendingLeaves = leaves.filter(l => l.status === 'pending');
 
   const currentRecords = attendance.filter(a => a.date === selectedDate);
@@ -742,7 +832,7 @@ const AttendanceView = ({ students }) => {
                     {isLocating ? 'Locating...' : 'Check In'}
                   </button>
                 ) : !myRecord.checkOut ? (
-                  <button onClick={() => teacherCheckOut(user.id)} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all">Check Out</button>
+                  <button onClick={handleTeacherCheckOut} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all">Check Out</button>
                 ) : (
                   <div className="text-right">
                     <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Check-Out</p>
@@ -811,7 +901,7 @@ const TeacherPanel = () => {
     overview: <OverviewView stats={stats} />, 
     students: <StudentsView students={students} />, 
     pending:  <PendingView />,
-    submissions: <SubmissionsView />, 
+    submissions: <SubmissionsView students={students} />, 
     curriculum: <CurriculumView />, 
     attendance: <AttendanceView students={students} />,
     certificates: <CertificatesView students={students} /> 
