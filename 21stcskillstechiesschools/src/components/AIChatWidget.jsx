@@ -6,6 +6,7 @@ import {
   TrendingUp, BookOpen, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { addNotification } from '../lib/store';
 
 const AIChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -239,14 +240,12 @@ const AIChatWidget = () => {
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   <button type="button" onClick={() => {
-                    const evt = new CustomEvent('show-notification', { detail: { title: 'Image Upload', body: 'Image vision features are coming soon.', type: 'info' } });
-                    window.dispatchEvent(evt);
+                    addNotification({ title: 'Image Upload', body: 'Image vision features are coming soon.', type: 'info' });
                   }} className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors">
                     <ImageIcon className="w-4 h-4" />
                   </button>
                   <button type="button" onClick={() => {
-                    const evt = new CustomEvent('show-notification', { detail: { title: 'Voice Input', body: 'Voice transcription will be available in v3.0.', type: 'info' } });
-                    window.dispatchEvent(evt);
+                    addNotification({ title: 'Voice Input', body: 'Voice transcription will be available in v3.0.', type: 'info' });
                   }} className="p-2 text-zinc-600 hover:text-zinc-400 transition-colors">
                     <Mic className="w-4 h-4" />
                   </button>

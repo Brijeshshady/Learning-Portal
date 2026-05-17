@@ -75,17 +75,66 @@ const getAIResponse = async (userMessage, userContext, apiKey) => {
     } catch (err) {
         console.error("[AI SERVICE] Fatal Error:", err.message);
         
-        // Return a gracefully structured error response
-        return {
-            text: `I encountered a momentary glitch in my neural network ($${err.message}). How else can I assist you with your Grade ${userContext.grade} studies?`,
-            suggestions: ["Try again", "Go to Dashboard", "View Roadmap"],
-            richContent: {
-                type: "insight",
-                title: "System Alert",
-                content: "The AI Mentor is currently experiencing high load or connectivity issues. Please try again in a few moments."
-            }
-        };
+        // Smart Local Fallback Response Generator for Offline/Mock-Key support
+        try {
+            return generateMockResponse(userMessage, userContext, err.message);
+        } catch (fallbackErr) {
+            return {
+                text: `I encountered a momentary glitch in my neural network (${err.message}). How else can I assist you with your Grade ${userContext.grade} studies?`,
+                suggestions: ["Try again", "Go to Dashboard", "View Roadmap"],
+                richContent: {
+                    type: "insight",
+                    title: "System Alert",
+                    content: "The AI Mentor is currently experiencing high load or connectivity issues. Please try again in a few moments."
+                }
+            };
+        }
     }
+};
+
+const generateMockResponse = (userMessage, userContext, errMessage) => {
+    const msg = userMessage.toLowerCase();
+    const { name, grade, role } = userContext;
+
+    let text = `Hi ${name}! I am your AI Mentor. It looks like my high-speed connection is offline (${errMessage || 'Service Cooldown'}), but my local neural processor is active! How can I help you with your Grade ${grade} studies today?`;
+    let suggestions = ["Tell me about Python", "What is Robotics?", "What are Neural Networks?", "View my weekly roadmap"];
+    let richContent = null;
+
+    if (msg.includes("python") || msg.includes("loop") || msg.includes("variable") || msg.includes("code") || msg.includes("program")) {
+        text = `### 🐍 Master Python Programming!\n\nHi ${name}! Python is the language of AI. In Grade ${grade}, you'll learn about variables, loops, logic, and simple lists. Here's a quick example of a loop in Python:\n\n\`\`\`python\n# Printing numbers 1 to 5\nfor i in range(1, 6):\n    print("Step:", i)\n\`\`\`\n\nWhat topic would you like to explore next?`;
+        suggestions = ["What is a Variable?", "Explain If-Else Logic", "Python Functions", "Go to AI Lab"];
+        richContent = {
+            type: "module_overview",
+            title: "Python Foundations",
+            content: "Learn variables, conditional loops, functions, and data operations.",
+            completion: 45,
+            concepts: ["Variables & Types", "Conditional Logic", "For/While Loops", "Defining Functions"]
+        };
+    } else if (msg.includes("robot") || msg.includes("sensor") || msg.includes("actuator") || msg.includes("circuit") || msg.includes("hardware")) {
+        text = `### 🤖 Robotics Foundation!\n\nRobotics connects computer code with the physical world. In the **21stc Curriculum**, you'll master:\n\n1. **Sensors**: Inputs like Ultrasonic (distance) and Light sensors.\n2. **Microcontrollers**: The brain (like Arduino or Raspberry Pi).\n3. **Actuators**: Outputs like Servos and Motors.\n\nWould you like to build a virtual sensor circuit today?`;
+        suggestions = ["How Ultrasonic Sensors work", "What is a Servo Motor?", "Arduino Programming", "Go to Projects"];
+        richContent = {
+            type: "module_overview",
+            title: "Robotics Foundation",
+            content: "Master hardware components, circuitry, microcontrollers, and servo motors.",
+            completion: 75,
+            concepts: ["Sensor Inputs", "Arduino Sketching", "Voltage & Resistance", "Servo Control"]
+        };
+    } else if (msg.includes("neural") || msg.includes("ai") || msg.includes("learning") || msg.includes("intelligence") || msg.includes("nlp") || msg.includes("vision")) {
+        text = `### 🧠 Neural Networks & Advanced AI!\n\nAI replicates human intelligence. **Neural Networks** are inspired by the human brain, using interconnected nodes (neurons) arranged in layers to recognize patterns in data.\n\n* **Input Layer**: Receives features (e.g. image pixels).\n* **Hidden Layers**: Extracts patterns.\n* **Output Layer**: Makes predictions.\n\nLet's discuss how computer vision detects objects!`;
+        suggestions = ["What is Computer Vision?", "How Neural Networks learn", "What is NLP?", "View My Roadmap"];
+        richContent = {
+            type: "insight",
+            title: "AI & Neural Networks",
+            content: "Deep learning relies on layered neural networks to process multidimensional data such as visual frames and textual tokens.",
+            completion: 20
+        };
+    } else if (msg.includes("hi") || msg.includes("hello") || msg.includes("hey") || msg.includes("help")) {
+        text = `### 👋 Hello, ${name}!\n\nWelcome to your **21stc AI Mentor** space. I am here to guide you step-by-step through our advanced tech syllabus:\n\n* 🤖 **Weeks 1-12**: Robotics Foundation.\n* 🐍 **Weeks 13-24**: Python for AI.\n* 🧠 **Weeks 25-36**: Advanced AI & Neural Networks.\n\nAsk me any question about your studies or click a suggestion below to get started!`;
+        suggestions = ["Tell me about Python", "What is Robotics?", "What are Neural Networks?", "My Weekly Roadmap"];
+    }
+
+    return { text, suggestions, richContent };
 };
 
 module.exports = { getAIResponse };

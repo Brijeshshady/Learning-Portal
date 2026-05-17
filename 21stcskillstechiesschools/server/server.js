@@ -255,6 +255,22 @@ app.get('/api/tokens', protect, authorize('admin', 'school-admin'), async (req, 
     }
 });
 
+app.put('/api/users/profile', protect, async (req, res) => {
+    try {
+        const { name, email } = req.body;
+        const user = await User.findOne({ id: req.user.id });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        if (name) user.name = name;
+        if (email) user.email = email;
+        
+        await user.save();
+        res.json({ name: user.name, email: user.email });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // AI Chat Route
 app.post('/api/ai/chat', protect, async (req, res) => {
     try {

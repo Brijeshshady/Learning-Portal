@@ -80,13 +80,29 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ── Update Profile ─────────────────────────────────────────────────────────
-  const updateProfile = useCallback((updates) => {
-    setUser((prev) => {
-      const newUser = { ...prev, ...updates };
-      if (newUser.name) localStorage.setItem('userName', newUser.name);
-      if (newUser.email) localStorage.setItem('userEmail', newUser.email);
-      return newUser;
-    });
+  const updateProfile = useCallback(async (updates) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      const res = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser((prev) => {
+          const newUser = { ...prev, ...data };
+          if (newUser.name) localStorage.setItem('userName', newUser.name);
+          if (newUser.email) localStorage.setItem('userEmail', newUser.email);
+          return newUser;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update profile on backend:", err);
+    }
   }, []);
 
   // ── Logout ──────────────────────────────────────────────────────────────────

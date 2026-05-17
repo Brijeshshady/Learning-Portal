@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin, Clock, ThumbsUp, ThumbsDown, Inbox, ClipboardList } from 'lucide-react';
@@ -8,6 +8,8 @@ import { getHubData } from '../lib/mapping';
 import useStore from '../hooks/useStore';
 import { addUser, removeUser, updateUser, exportCSV, addNotification, markAttendance, updateLeaveStatus, submitGrade, submitAssignment } from '../lib/store';
 import Modal from '../components/Modal';
+import html2pdf from 'html2pdf.js';
+import CertificateTemplate from '../components/CertificateTemplate';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
   AreaChartCard, BarChartCard, ActivityFeed, SectionCard,
@@ -220,6 +222,9 @@ const CertificatesView = () => {
   const [hubStudents, setHubStudents] = useState([]);
   const [hubCerts, setHubCerts] = useState([]);
 
+  const certRef = useRef(null);
+  const [activeCert, setActiveCert] = useState(null);
+
   const fetchData = async () => {
     if (user?.schoolId) {
       const [studentsData, certsData] = await Promise.all([
@@ -248,8 +253,33 @@ const CertificatesView = () => {
     fetchData();
   };
 
+  const handleDownload = (cert) => {
+    setActiveCert(cert);
+    addNotification({ title: 'Generating PDF...', body: `Certificate ${cert.id}.pdf is being generated.`, type: 'info' });
+    
+    setTimeout(() => {
+      if (certRef.current) {
+        const opt = {
+          margin:       0,
+          filename:     `${cert.title.replace(/\s+/g, '_')}_Certificate.pdf`,
+          image:        { type: 'jpeg', quality: 1 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'px', format: [1123, 794], orientation: 'landscape' }
+        };
+        
+        html2pdf().set(opt).from(certRef.current).save().then(() => {
+           addNotification({ title: 'Success', body: `Certificate downloaded successfully.`, type: 'success' });
+           setActiveCert(null);
+        });
+      }
+    }, 500);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Hidden Certificate Template for PDF Generation */}
+      <CertificateTemplate cert={activeCert} ref={certRef} />
+
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Hub Certificates</h2>
@@ -263,11 +293,11 @@ const CertificatesView = () => {
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
         <table className="w-full text-left">
           <thead className="border-b border-zinc-800">
-            <tr>{['ID', 'Student', 'Credential', 'Issued By', 'Date'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+            <tr>{['ID', 'Student', 'Credential', 'Issued By', 'Date', 'Actions'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
             {hubCerts.length === 0 ? (
-              <tr><td colSpan="5" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No certificates issued yet.</td></tr>
+              <tr><td colSpan="6" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No certificates issued yet.</td></tr>
             ) : (
               hubCerts.map((c) => (
                 <tr key={c.id} className="hover:bg-white/[0.01] transition-all">
@@ -276,6 +306,11 @@ const CertificatesView = () => {
                   <td className="px-6 py-4 text-xs font-bold text-zinc-400">{c.title}</td>
                   <td className="px-6 py-4 text-xs font-bold text-zinc-500">{c.issuedBy}</td>
                   <td className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-600">{c.date}</td>
+                  <td className="px-6 py-4">
+                    <button onClick={() => handleDownload(c)} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-600 text-zinc-400 hover:text-white transition-all flex items-center gap-1">
+                      <Download className="w-3 h-3" /> PDF
+                    </button>
+                  </td>
                 </tr>
               ))
             )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle } from 'lucide-react';
@@ -11,6 +11,8 @@ import {
 import useStore from '../hooks/useStore';
 import { submitGrade, submitAssignment, exportCSV, addNotification, markAttendance, teacherCheckIn, teacherCheckOut, updateLeaveStatus } from '../lib/store';
 import Modal from '../components/Modal';
+import html2pdf from 'html2pdf.js';
+import CertificateTemplate from '../components/CertificateTemplate';
 
 
 
@@ -240,6 +242,9 @@ const CertificatesView = ({ students }) => {
   const [certType, setCertType] = useState('AI Innovation Lab - Beginner');
   const [certificates, setCertificates] = useState([]);
 
+  const certRef = useRef(null);
+  const [activeCert, setActiveCert] = useState(null);
+
   const fetchCerts = async () => {
     const data = await DB.getCertificates();
     setCertificates(data);
@@ -267,8 +272,33 @@ const CertificatesView = ({ students }) => {
     fetchCerts();
   };
 
+  const handleDownload = (cert) => {
+    setActiveCert(cert);
+    addNotification({ title: 'Generating PDF...', body: `Certificate ${cert.id}.pdf is being generated.`, type: 'info' });
+    
+    setTimeout(() => {
+      if (certRef.current) {
+        const opt = {
+          margin:       0,
+          filename:     `${cert.title.replace(/\s+/g, '_')}_Certificate.pdf`,
+          image:        { type: 'jpeg', quality: 1 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'px', format: [1123, 794], orientation: 'landscape' }
+        };
+        
+        html2pdf().set(opt).from(certRef.current).save().then(() => {
+           addNotification({ title: 'Success', body: `Certificate downloaded successfully.`, type: 'success' });
+           setActiveCert(null);
+        });
+      }
+    }, 500);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Hidden Certificate Template for PDF Generation */}
+      <CertificateTemplate cert={activeCert} ref={certRef} />
+
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Issue Certificates</h2>
@@ -280,6 +310,9 @@ const CertificatesView = ({ students }) => {
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-zinc-800">
+          <p className="text-xs font-black text-white uppercase tracking-widest">Student Summary</p>
+        </div>
         <table className="w-full text-left">
           <thead className="border-b border-zinc-800">
             <tr>{['Student', 'Recent Certifications', 'Total Credentials'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
@@ -306,6 +339,37 @@ const CertificatesView = ({ students }) => {
                   </tr>
                 );
               })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-zinc-800">
+          <p className="text-xs font-black text-white uppercase tracking-widest">Issued Credentials Log</p>
+        </div>
+        <table className="w-full text-left">
+          <thead className="border-b border-zinc-800">
+            <tr>{['ID', 'Student', 'Credential', 'Issued By', 'Date', 'Actions'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800">
+            {certificates.length === 0 ? (
+              <tr><td colSpan="6" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No certificates issued yet.</td></tr>
+            ) : (
+              certificates.map((c) => (
+                <tr key={c.id} className="hover:bg-white/[0.01] transition-all">
+                  <td className="px-6 py-4 text-[10px] font-mono text-blue-400 font-bold">{c.id}</td>
+                  <td className="px-6 py-4 font-bold text-white text-sm">{c.studentName}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-zinc-400">{c.title}</td>
+                  <td className="px-6 py-4 text-xs font-bold text-zinc-500">{c.issuedBy}</td>
+                  <td className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-600">{c.date}</td>
+                  <td className="px-6 py-4">
+                    <button onClick={() => handleDownload(c)} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-600 text-zinc-400 hover:text-white transition-all flex items-center gap-1">
+                      <Download className="w-3 h-3" /> PDF
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

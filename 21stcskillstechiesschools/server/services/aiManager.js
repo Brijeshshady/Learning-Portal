@@ -38,9 +38,14 @@ class AIManager {
      * Executes a chat request using the best available slot
      */
     async getBalancedResponse(message, userContext) {
-        const slot = this.getAvailableSlot();
-        
-        if (!slot) {
+        const now = Date.now();
+        // Get all slots that are not fully rate-limited in this minute
+        const availableSlots = this.slots.filter(slot => {
+            slot.usage = slot.usage.filter(timestamp => (now - timestamp) < this.COOLDOWN_MS);
+            return slot.usage.length < slot.limit;
+        });
+
+        if (availableSlots.length === 0) {
             console.warn("[AI MANAGER] All API slots exhausted. Capacity reached (25 req/min).");
             return {
                 text: "My neural circuits are a bit busy right now due to high demand! Please wait a few seconds and try again.",
@@ -48,15 +53,29 @@ class AIManager {
             };
         }
 
-        // Record usage
-        slot.usage.push(Date.now());
-        console.log(`[AI MANAGER] Using Slot ${slot.id}. Usage: ${slot.usage.length}/${slot.limit} | Key: ${slot.key?.substring(0, 8)}...`);
+        let lastError = null;
+        for (let slot of availableSlots) {
+            // Record usage
+            slot.usage.push(now);
+            console.log(`[AI MANAGER] Attempting Slot ${slot.id}. Usage: ${slot.usage.length}/${slot.limit} | Key: ${slot.key?.substring(0, 8)}...`);
 
+            try {
+                const res = await getAIResponse(message, userContext, slot.key);
+                // Return result if it successfully completed or fallback-handled
+                return res;
+            } catch (err) {
+                console.error(`[AI MANAGER] Error in Slot ${slot.id}:`, err.message);
+                lastError = err;
+                // Continue loop to try next slot
+            }
+        }
+
+        // Fallback to the first slot's error handling to trigger graceful local mock syllabus generation
+        console.warn("[AI MANAGER] All attempted slots failed. Triggering local mock fallback.");
         try {
-            return await getAIResponse(message, userContext, slot.key);
+            return await getAIResponse(message, userContext, this.slots[0].key);
         } catch (err) {
-            console.error(`[AI MANAGER] Error in Slot ${slot.id}:`, err.message);
-            throw err;
+            throw lastError || err;
         }
     }
 }

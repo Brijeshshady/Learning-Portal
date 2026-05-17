@@ -21,6 +21,7 @@ import {
   Award,
   Calendar,
   Inbox,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useStore from '../hooks/useStore';
@@ -82,6 +83,7 @@ const MENUS = {
       { name: 'My Pending',       view: 'pending',    icon: Inbox, badge: true },
       { name: 'Weekly Roadmap',   view: 'roadmap',   icon: Zap },
       { name: 'Certificates',     view: 'certificates', icon: Award },
+      { name: 'Leaderboard',      view: 'leaderboard',   icon: Trophy },
       { name: 'Community',        route: '/community', icon: MessageSquare },
       { name: 'Support',          view: 'support',   icon: HelpCircle },
     ],
