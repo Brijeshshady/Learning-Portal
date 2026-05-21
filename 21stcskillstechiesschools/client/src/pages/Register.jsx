@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, LayoutGrid, Rocket, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { addUser } from '../lib/store';
+import DB from '../lib/db';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -27,36 +27,58 @@ const Register = () => {
     }
   };
 
-  const completeRegistration = (role, code = null) => {
+  const completeRegistration = async (role, code = null) => {
     setLoading(true);
-    
-    let newUserId = `u${Date.now()}`;
-    // Add to global store for persistence and admin visibility
+    const name = `${formData.firstName} ${formData.lastName}`.trim() || 'New User';
+
     try {
-      const newUser = addUser({
-        name: `${formData.firstName} ${formData.lastName}`.trim() || 'New User',
+      // Primary path: register via backend to get a real JWT token
+      const dbUser = await DB.register({
+        name,
         email: formData.email,
-        password: formData.password, // Store for demo purposes
-        role: role,
+        password: formData.password,
+        role: role || 'student',
         schoolId: code || null,
-        grade: 6, // Default grade
-        status: 'active'
+        grade: 6,
       });
-      if (newUser && newUser.id) newUserId = newUser.id;
-    } catch (e) {
-      console.warn('Store not available for registration persistence', e);
+
+      // Persist session (same as login)
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userId',    dbUser.id);
+      localStorage.setItem('userRole',  dbUser.role);
+      localStorage.setItem('userName',  dbUser.name);
+      localStorage.setItem('userEmail', dbUser.email);
+      localStorage.setItem('userToken', dbUser.token);
+      if (dbUser.schoolId) localStorage.setItem('schoolCode', dbUser.schoolId);
+
+      // Hard navigate so AuthContext re-hydrates with the new DB user
+      setTimeout(() => window.location.replace('/student'), 300);
+      return;
+    } catch (err) {
+      console.warn('[Register] Backend registration failed, falling back to local:', err.message);
+      // If it's a validation error (duplicate email etc.), surface it to the user
+      if (!err.message.toLowerCase().includes('fetch') && !err.message.toLowerCase().includes('network')) {
+        setLoading(false);
+        alert(err.message);
+        return;
+      }
     }
 
-    // Persist session
+    // Fallback: offline-only local registration (no JWT, limited access)
+    let newUserId = `u${Date.now()}`;
+    try {
+      const newUser = await DB.register ? null : null; // skip second attempt
+      newUserId = newUser?.id || newUserId;
+    } catch (_) {}
+
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userId',     newUserId);
-    localStorage.setItem('userRole',   role);
-    localStorage.setItem('userName',   `${formData.firstName} ${formData.lastName}`.trim() || 'New User');
+    localStorage.setItem('userRole',   role || 'student');
+    localStorage.setItem('userName',   name);
     localStorage.setItem('userEmail',  formData.email);
     localStorage.setItem('userToken',  `local_${Date.now()}`);
     if (code) localStorage.setItem('schoolCode', code);
 
-    // Hard navigate to force AuthContext re-hydration
     setTimeout(() => window.location.replace('/student'), 300);
   };
 

@@ -58,6 +58,14 @@ const StudentsView = ({ students }) => {
   const submissions = store.submissions || [];
   const attendance = store.attendance || [];
   const certificates = store.certificates || [];
+  const allUsers = store.users || [];
+
+  const getMarkerName = (markedById) => {
+    if (!markedById) return '—';
+    const marker = allUsers.find(u => u.id === markedById);
+    if (marker) return `${marker.name} (${marker.role === 'teacher' ? 'Teacher' : 'Admin'})`;
+    return markedById;
+  };
 
   const filtered = students.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -343,7 +351,7 @@ const StudentsView = ({ students }) => {
                                       <span className="text-[9px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg uppercase">Absent</span>
                                     )}
                                   </td>
-                                  <td className="px-6 py-4 text-xs text-zinc-500 font-bold">Ms. Kavitha (Teacher)</td>
+                                  <td className="px-6 py-4 text-xs text-zinc-500 font-bold">{getMarkerName(att.markedBy)}</td>
                                 </tr>
                               ))}
                             </tbody>

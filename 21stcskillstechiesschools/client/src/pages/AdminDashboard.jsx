@@ -487,7 +487,7 @@ const SystemMonitorView = ({ stats }) => {
                         </svg>
                       )}
                       {isActLoading ? act.loadingText : isActDone ? act.doneText : act.buttonText}
-                    </button>
+                     </button>
                   </div>
                 );
               })}
@@ -505,53 +505,72 @@ const UsersView = () => {
   const [search, setSearch] = React.useState('');
   const [editingUser, setEditingUser] = React.useState(null);
   const [showModal, setShowModal] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState('');
   const [formData, setFormData] = React.useState({ name: '', email: '', role: 'student', hub: 'HUB-CH-01', status: 'active' });
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredUsers = users.filter(u =>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
     u.email.toLowerCase().includes(search.toLowerCase()) ||
     u.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
     u.role.toLowerCase().includes(search.toLowerCase()) ||
-    u.status.toLowerCase().includes(search.toLowerCase())
+    (u.status || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const handleOpenEdit = (u) => {
     setEditingUser(u);
+    setSaveError('');
     setFormData({ name: u.name, email: u.email, role: u.role, hub: u.schoolId || '', status: u.status });
     setShowModal(true);
   };
 
   const handleOpenAdd = () => {
     setEditingUser(null);
+    setSaveError('');
     setFormData({ name: '', email: '', role: 'student', hub: 'HUB-CH-01', status: 'active', grade: 6 });
     setShowModal(true);
   };
 
-  const handleSaveUser = (e) => {
+  const handleSaveUser = async (e) => {
     e.preventDefault();
-    if (editingUser) {
-      updateUser(editingUser.id, { name: formData.name, email: formData.email, role: formData.role, schoolId: formData.hub, status: formData.status });
-      addNotification({ title: 'User Updated', body: `${formData.name} has been updated successfully.`, type: 'success' });
-    } else {
-      try {
-        addUser({ 
-          name: formData.name, 
-          email: formData.email, 
-          role: formData.role, 
-          schoolId: formData.hub, 
-          grade: formData.role === 'student' ? Number(formData.grade) : null, 
-          status: formData.status 
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, { name: formData.name, email: formData.email, role: formData.role, schoolId: formData.hub, status: formData.status });
+        addNotification({ title: 'User Updated', body: `${formData.name} has been updated successfully.`, type: 'success' });
+      } else {
+        await addUser({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          schoolId: formData.hub,
+          grade: formData.role === 'student' ? Number(formData.grade) : null,
+          status: formData.status
         });
         addNotification({ title: 'User Provisioned', body: `${formData.name} has been added successfully.`, type: 'success' });
-        setShowModal(false);
-      } catch (err) {
-        console.error(err);
       }
+      setShowModal(false);
+    } catch (err) {
+      console.error(err);
+      setSaveError(err.message || 'Failed to save user. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleExport = () => {
-    exportCSV(filteredUsers.map(u => ({ Name: u.name, Email: u.email, Role: u.role, Hub: u.schoolId, Status: u.status })), 'users_export.csv');
+  const handleRemoveUser = async (u) => {
+    const adminUser = users.find(x => x.id === 'u0');
+    if (u.email === adminUser?.email) {
+      alert('Security Error: Cannot remove the primary Super Admin account.');
+      return;
+    }
+    if (!confirm(`Remove ${u.name}? This action cannot be undone.`)) return;
+    try {
+      await removeUser(u.id);
+    } catch (err) {
+      addNotification({ title: 'Error', body: err.message || 'Failed to remove user.', type: 'error' });
+    }
   };
 
   return (
@@ -669,21 +688,14 @@ const UsersView = () => {
                   </div>
 
                   <div className="flex justify-end gap-2 mt-5 pt-3.5 border-t border-zinc-900/60">
-                    <button 
-                      onClick={() => handleOpenEdit(u)} 
+                    <button
+                      onClick={() => handleOpenEdit(u)}
                       className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-700 text-zinc-400 hover:text-white transition-all"
                     >
                       Edit
                     </button>
-                    <button 
-                      onClick={() => {
-                        const adminUser = users.find(x => x.id === 'u0');
-                        if (u.email === adminUser?.email) {
-                          alert("Security Error: Cannot remove the primary Super Admin account.");
-                          return;
-                        }
-                        if(confirm(`Remove ${u.name}?`)) removeUser(u.id);
-                      }} 
+                    <button
+                      onClick={() => handleRemoveUser(u)}
                       className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition-all"
                     >
                       Remove
@@ -696,7 +708,7 @@ const UsersView = () => {
         )}
       </div>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingUser ? "Edit User Profile" : "Provision New User"}>
+      <Modal isOpen={showModal} onClose={() => { if (!saving) setShowModal(false); }} title={editingUser ? "Edit User Profile" : "Provision New User"}>
         <form onSubmit={handleSaveUser} className="space-y-4">
           <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Full Name</label><input required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} type="text" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="e.g. John Doe" /></div>
           <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Email Address</label><input required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} type="email" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" placeholder="john@21stc.school" /></div>
@@ -721,7 +733,17 @@ const UsersView = () => {
           {editingUser && (
             <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Status</label><select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
           )}
-          <button type="submit" className="w-full bg-primary text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">{editingUser ? "Save Changes" : "Provision Account"}</button>
+          {saveError && (
+            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 font-bold">{saveError}</p>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-primary text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-wait flex items-center justify-center gap-2"
+          >
+            {saving && <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
+            {saving ? 'Saving...' : editingUser ? 'Save Changes' : 'Provision Account'}
+          </button>
         </form>
       </Modal>
     </div>
@@ -1283,7 +1305,7 @@ const AdminDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedHub, setSelectedHub] = React.useState('ALL');
   const [stats, setStats] = React.useState(null);
-  const { hubs, maintenanceMode, getState } = useStore();
+  const { hubs, maintenanceMode } = useStore();
   const activeView = searchParams.get('v') || 'dashboard';
 
   React.useEffect(() => {

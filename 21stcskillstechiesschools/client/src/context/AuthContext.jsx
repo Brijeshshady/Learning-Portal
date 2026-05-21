@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DB from '../lib/db';
-import { getState } from '../lib/store';
+import { getState, syncUsersWithBackend } from '../lib/store';
 import { ROLE_ROUTES, VALID_ROLES } from '../lib/mapping';
 
 const AuthContext = createContext(null);
@@ -12,41 +12,72 @@ export const AuthProvider = ({ children }) => {
 
   // ── Bootstrap: re-hydrate session from localStorage on first load ──────────
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const role       = localStorage.getItem('userRole');
-    const email      = localStorage.getItem('userEmail');
-    const token      = localStorage.getItem('userToken');
+    const bootstrap = async () => {
+      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      const role       = localStorage.getItem('userRole');
+      const email      = localStorage.getItem('userEmail');
+      const token      = localStorage.getItem('userToken');
 
-    if (isLoggedIn && VALID_ROLES.includes(role) && email && token) {
-      // Verify user still exists in store/DB to prevent stale redirects
-      const storeUsers = getState().users || [];
-      const exists = storeUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (exists) {
-        let grades = exists.grades;
-        const storedGrades = localStorage.getItem('userGrades');
-        if (storedGrades) {
-          try { grades = JSON.parse(storedGrades); } catch (e) {}
+      if (isLoggedIn && VALID_ROLES.includes(role) && email && token) {
+        // 1. Try to verify against backend DB first (catches token-user mismatches)
+        let backendUser = null;
+        try {
+          backendUser = await DB.getUser(email);
+        } catch (err) {
+          // Ignore network errors – fall back to store check below
         }
-        setUser({
-          id:       localStorage.getItem('userId') || exists.id,
-          name:     localStorage.getItem('userName')  || exists.name,
-          email:    email,
-          role:     role,
-          token:    token,
-          schoolId: localStorage.getItem('schoolCode') || exists.schoolId,
-          grades:   grades || [],
-        });
-      } else {
-        // User no longer in system, purge session
+
+        if (backendUser) {
+          // Verified in DB — restore session using the freshest data
+          let grades = backendUser.grades;
+          const storedGrades = localStorage.getItem('userGrades');
+          if (storedGrades) {
+            try { grades = JSON.parse(storedGrades); } catch (e) {}
+          }
+          setUser({
+            id:       backendUser.id || localStorage.getItem('userId'),
+            name:     backendUser.name || localStorage.getItem('userName'),
+            email:    email,
+            role:     backendUser.role || role,
+            token:    token,
+            schoolId: backendUser.schoolId || localStorage.getItem('schoolCode') || null,
+            grades:   grades || [],
+          });
+          // Sync the full user list from DB into the reactive store
+          await syncUsersWithBackend();
+        } else {
+          // 2. Fallback: check in-memory store (offline / network unavailable)
+          const storeUsers = getState().users || [];
+          const exists = storeUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+          if (exists) {
+            let grades = exists.grades;
+            const storedGrades = localStorage.getItem('userGrades');
+            if (storedGrades) {
+              try { grades = JSON.parse(storedGrades); } catch (e) {}
+            }
+            setUser({
+              id:       localStorage.getItem('userId') || exists.id,
+              name:     localStorage.getItem('userName')  || exists.name,
+              email:    email,
+              role:     role,
+              token:    token,
+              schoolId: localStorage.getItem('schoolCode') || exists.schoolId,
+              grades:   grades || [],
+            });
+          } else {
+            // User no longer in system, purge session
+            ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode', 'userGrades'].forEach(k => localStorage.removeItem(k));
+            setUser(null);
+          }
+        }
+      } else if (isLoggedIn || role || email || token) {
+        // Clear corrupted/partial session data
         ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode', 'userGrades'].forEach(k => localStorage.removeItem(k));
-        setUser(null);
       }
-    } else if (isLoggedIn || role || email || token) {
-      // Clear corrupted/partial session data
-      ['isLoggedIn', 'userRole', 'userId', 'userName', 'userEmail', 'userToken', 'schoolCode', 'userGrades'].forEach(k => localStorage.removeItem(k));
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+    bootstrap();
   }, []);
 
   // ── Login ───────────────────────────────────────────────────────────────────
@@ -76,6 +107,8 @@ export const AuthProvider = ({ children }) => {
       grades:   dbUser.grades || [],
     };
     setUser(sessionUser);
+    // Pull the latest user list from DB into the reactive store
+    syncUsersWithBackend().catch(err => console.warn('[AuthContext] post-login sync failed:', err));
     return sessionUser;
   }, []);
 

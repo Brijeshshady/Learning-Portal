@@ -24,7 +24,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 const initialUsers = [
   { id: 'u0', name: 'Super Admin',   email: 'superadmin@21stc.com', password: 'password123', role: 'admin',        schoolId: null,         status: 'active' },
   { id: 'u5', name: 'Hub Manager',   email: 'hubadmin@21stc.com',   password: 'password123', role: 'school-admin', schoolId: 'HUB-CH-01',  status: 'active' },
-  { id: 'u4', name: 'Ms. Kavitha',   email: 'teacher@21stc.com',    password: 'password123', role: 'teacher',      schoolId: 'HUB-CH-01',  status: 'active', grades: [6, 7, 8] },
+  { id: 'u3', name: 'Ms. Kavitha',   email: 'teacher@21stc.com',    password: 'password123', role: 'teacher',      schoolId: 'HUB-CH-01',  status: 'active', grades: [6, 7, 8] },
   { id: 'u1', name: 'Arun Kumar',    email: 'student@21stc.com',    password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active', grade: 7 },
   { id: 'u2', name: 'Priya Selvi',   email: 'student2@21stc.com',   password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active', grade: 8 },
 ];
@@ -67,7 +67,7 @@ const initialGrades = {};
 const initialMaintenanceMode = false;
 
 const initialAttendance = [
-  { id: 'a1', studentId: 'u1', date: new Date().toISOString().split('T')[0], status: 'present', markedBy: 'u4' }
+  { id: 'a1', studentId: 'u1', date: new Date().toISOString().split('T')[0], status: 'present', markedBy: 'u3' }
 ];
 
 const initialLeaves = [
@@ -82,8 +82,8 @@ const initialSubmissions = [
 ];
 
 const initialCertificates = [
-  { id: 'CERT-A1B2-C3D4', studentId: 'u4', studentName: 'Arun Kumar', schoolId: 'HUB-CH-01', title: 'AI Innovation Lab - Beginner', issuedBy: 'Super Admin', date: '2026-05-01' },
-  { id: 'CERT-X9Y8-Z7W6', studentId: 'u5', studentName: 'Priya Selvi', schoolId: 'HUB-CH-01', title: 'Robotics Foundation', issuedBy: 'Hub Admin', date: '2026-04-15' },
+  { id: 'CERT-A1B2-C3D4', studentId: 'u1', studentName: 'Arun Kumar', schoolId: 'HUB-CH-01', title: 'AI Innovation Lab - Beginner', issuedBy: 'Super Admin', date: '2026-05-01' },
+  { id: 'CERT-X9Y8-Z7W6', studentId: 'u2', studentName: 'Priya Selvi', schoolId: 'HUB-CH-01', title: 'Robotics Foundation', issuedBy: 'Hub Admin', date: '2026-04-15' },
 ];
 
 /* ── Store state ───────────────────────────────────────────────────────── */
@@ -181,8 +181,33 @@ export const subscribe = (fn) => {
 export const getState = () => ({ ...state });
 
 // ── Users ──
-export const addUser = (user) => {
-  // Check for duplicate email
+
+/** Helper: get auth token for backend calls */
+const _getToken = () => localStorage.getItem('userToken') || '';
+
+/** Sync the in-memory store with the latest user list from MongoDB.
+ *  Called by AuthContext on boot and after every successful login. */
+export const syncUsersWithBackend = async () => {
+  try {
+    const token = _getToken();
+    if (!token) return; // Not logged in yet
+    const res = await fetch('/api/users', {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const dbUsers = await res.json();
+      // Merge: keep any local-only users (id starts with 'local_') and overwrite the rest
+      const localOnly = state.users.filter(u => String(u.id).startsWith('local_'));
+      state = { ...state, users: [...dbUsers, ...localOnly] };
+      notify();
+    }
+  } catch (err) {
+    console.warn('[store] syncUsersWithBackend failed, using local state', err);
+  }
+};
+
+export const addUser = async (user) => {
+  // Check for duplicate email in local state first
   const exists = state.users.find(u => u.email.toLowerCase() === user.email.toLowerCase());
   if (exists) {
     addNotification({ title: 'Error', body: 'A user with this email already exists.', type: 'error' });
@@ -201,11 +226,36 @@ export const addUser = (user) => {
     }
   }
 
-  const newUser = { 
-    password: 'password123', // Default password for all new users
-    ...user, 
-    id: `u${Date.now()}`, 
-    status: 'active' 
+  // Try backend first
+  try {
+    const token = _getToken();
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ ...user, password: user.password || 'password123' })
+    });
+    if (res.ok) {
+      const created = await res.json();
+      state = { ...state, users: [created, ...state.users] };
+      addNotification({ title: 'User Added', body: `${created.name} was added as ${created.role}.`, type: 'success' });
+      notify();
+      return created;
+    } else {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to create user on server');
+    }
+  } catch (err) {
+    // If it is a server validation error (e.g. duplicate), propagate it
+    if (err.message && !err.message.includes('fetch')) throw err;
+    // Network failure → fall back to local-only
+    console.warn('[store] addUser backend failed, falling back to local', err);
+  }
+
+  const newUser = {
+    password: 'password123',
+    ...user,
+    id: `u${Date.now()}`,
+    status: 'active'
   };
   state = { ...state, users: [newUser, ...state.users] };
   addNotification({ title: 'User Added', body: `${user.name} was added as ${user.role}.`, type: 'success' });
@@ -213,16 +263,39 @@ export const addUser = (user) => {
   return newUser;
 };
 
-export const updateUser = (id, patch) => {
+export const updateUser = async (id, patch) => {
+  // Optimistic local update
   state = { ...state, users: state.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) };
   notify();
+  // Sync to backend
+  try {
+    const token = _getToken();
+    await fetch(`/api/users/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(patch)
+    });
+  } catch (err) {
+    console.warn('[store] updateUser backend failed', err);
+  }
 };
 
-export const removeUser = (id) => {
+export const removeUser = async (id) => {
   const user = state.users.find((u) => u.id === id);
+  // Optimistic local removal
   state = { ...state, users: state.users.filter((u) => u.id !== id) };
   if (user) addNotification({ title: 'User Removed', body: `${user.name} was removed.`, type: 'warning' });
   notify();
+  // Sync to backend
+  try {
+    const token = _getToken();
+    await fetch(`/api/users/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+  } catch (err) {
+    console.warn('[store] removeUser backend failed', err);
+  }
 };
 
 // ── Notifications ──

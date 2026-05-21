@@ -255,57 +255,74 @@ const UsersView = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', role: 'student', grade: 6, status: 'active' });
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState('');
 
   const schoolUsers = users.filter(u => u.schoolId === user?.schoolId);
   const filtered = schoolUsers.filter(u => {
     const matchesFilter = filter === 'all' || u.role === filter;
-    const matchesSearch = 
-      u.name.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch =
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       u.role.toLowerCase().includes(search.toLowerCase()) ||
-      u.status.toLowerCase().includes(search.toLowerCase());
+      (u.status || '').toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
   const handleOpenEdit = (u) => {
     setEditingUser(u);
+    setSaveError('');
     setFormData({ name: u.name, email: u.email, role: u.role, grade: u.grade || 6, status: u.status || 'active' });
     setShowModal(true);
   };
 
   const handleOpenAdd = () => {
     setEditingUser(null);
+    setSaveError('');
     setFormData({ name: '', email: '', role: 'student', grade: 6, status: 'active' });
     setShowModal(true);
   };
 
-  const handleSaveMember = (e) => {
+  const handleSaveMember = async (e) => {
     e.preventDefault();
-    if (editingUser) {
-      updateUser(editingUser.id, { 
-        name: formData.name, 
-        email: formData.email, 
-        role: formData.role, 
-        grade: formData.role === 'student' ? Number(formData.grade) : null,
-        status: formData.status
-      });
-      addNotification({ title: 'Member Updated', body: `${formData.name} has been updated successfully.`, type: 'success' });
-    } else {
-      try {
-        addUser({ 
-          name: formData.name, 
-          email: formData.email, 
-          role: formData.role, 
-          schoolId: user?.schoolId, 
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          grade: formData.role === 'student' ? Number(formData.grade) : null,
+          status: formData.status
+        });
+        addNotification({ title: 'Member Updated', body: `${formData.name} has been updated successfully.`, type: 'success' });
+      } else {
+        await addUser({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          schoolId: user?.schoolId,
           grade: formData.role === 'student' ? Number(formData.grade) : null,
           status: formData.status
         });
         addNotification({ title: 'Member Added', body: `${formData.name} has been added successfully.`, type: 'success' });
-        setShowModal(false);
-      } catch (err) {
-        // Error notification is already handled in store.js, but we keep modal open
-        console.error(err);
       }
+      setShowModal(false);
+    } catch (err) {
+      console.error(err);
+      setSaveError(err.message || 'Failed to save member. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveMember = async (u) => {
+    if (!confirm(`Remove ${u.name}? This action cannot be undone.`)) return;
+    try {
+      await removeUser(u.id);
+    } catch (err) {
+      addNotification({ title: 'Error', body: err.message || 'Failed to remove member.', type: 'error' });
     }
   };
 
@@ -406,16 +423,14 @@ const UsersView = () => {
                   </div>
 
                   <div className="flex justify-end gap-2 mt-5 pt-3.5 border-t border-zinc-900/60">
-                    <button 
-                      onClick={() => handleOpenEdit(u)} 
+                    <button
+                      onClick={() => handleOpenEdit(u)}
                       className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-700 text-zinc-400 hover:text-white transition-all"
                     >
                       Edit
                     </button>
-                    <button 
-                      onClick={() => {
-                        if(confirm(`Remove ${u.name}?`)) removeUser(u.id);
-                      }} 
+                    <button
+                      onClick={() => handleRemoveMember(u)}
                       className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition-all"
                     >
                       Remove
@@ -446,7 +461,17 @@ const UsersView = () => {
           {editingUser && (
             <div><label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Status</label><select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
           )}
-          <button type="submit" className="w-full bg-emerald-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20">{editingUser ? "Save Changes" : "Add Member"}</button>
+          {saveError && (
+            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5 font-bold">{saveError}</p>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-emerald-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-60 disabled:cursor-wait flex items-center justify-center gap-2"
+          >
+            {saving && <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
+            {saving ? 'Saving...' : editingUser ? 'Save Changes' : 'Add Member'}
+          </button>
         </form>
       </Modal>
     </div>

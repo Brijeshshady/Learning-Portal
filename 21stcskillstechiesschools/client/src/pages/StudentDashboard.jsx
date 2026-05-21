@@ -392,30 +392,39 @@ const ProjectsView = ({ user }) => {
 };
 
 /* ── Roadmap ──────────────────────────────────────────────── */
-const RoadmapView = ({ setView }) => (
+const RoadmapView = ({ setView, stats }) => {
+  // Parse week from stats e.g. "7/36"
+  const weekStr = stats?.kpis?.week || '1/36';
+  const currentWeek = parseInt(weekStr.split('/')[0], 10) || 1;
+  const completed = Math.max(0, currentWeek - 1);
+  const inProgress = 1;
+  const remaining = Math.max(0, 36 - currentWeek);
+
+  return (
   <div className="space-y-6">
-    <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Your 36-Week Journey</h2><p className="text-zinc-500 text-sm mt-1">Week 7 active — complete each week to unlock the next.</p></div>
+    <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Your 36-Week Journey</h2><p className="text-zinc-500 text-sm mt-1">Week {currentWeek} active — complete each week to unlock the next.</p></div>
     <SectionCard>
       <div className="grid grid-cols-6 sm:grid-cols-9 md:grid-cols-12 gap-2">
         {[...Array(36)].map((_, i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             onClick={() => setView('ai-lab')}
             className={`aspect-square rounded-xl border flex items-center justify-center text-[9px] font-black transition-all cursor-pointer hover:scale-110 active:scale-95 ${
-            i < 6  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' :
-            i === 6 ? 'bg-primary border-primary text-white shadow-xl shadow-primary/30 scale-110 hover:brightness-110' :
+            i < completed  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' :
+            i === completed ? 'bg-primary border-primary text-white shadow-xl shadow-primary/30 scale-110 hover:brightness-110' :
             'bg-zinc-800/50 border-zinc-700 text-zinc-600 opacity-40 hover:opacity-100'
           }`}>{i + 1}</div>
         ))}
       </div>
     </SectionCard>
     <div className="grid grid-cols-3 gap-4">
-      {[{ label: 'Completed', value: '6', cls: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' }, { label: 'In Progress', value: '1', cls: 'text-primary border-primary/20 bg-primary/5' }, { label: 'Remaining', value: '29', cls: 'text-zinc-500 border-zinc-700 bg-zinc-800/50' }].map((s) => (
+      {[{ label: 'Completed', value: String(completed), cls: 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' }, { label: 'In Progress', value: String(inProgress), cls: 'text-primary border-primary/20 bg-primary/5' }, { label: 'Remaining', value: String(remaining), cls: 'text-zinc-500 border-zinc-700 bg-zinc-800/50' }].map((s) => (
         <div key={s.label} className={`${s.cls} border rounded-2xl p-5 text-center`}><p className={`text-3xl font-black font-headline ${s.cls.split(' ')[0]}`}>{s.value}</p><p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mt-1">{s.label}</p></div>
       ))}
     </div>
   </div>
 );
+};
 
 /* ── Support ──────────────────────────────────────────────── */
 const SupportView = () => {
@@ -1072,7 +1081,7 @@ const StudentDashboard = () => {
     'exam-results': <Results />,
     'ai-lab': <AILabView />,
     projects: <ProjectsView user={user} />,
-    roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} />,
+    roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} stats={stats} />,
     attendance: <MyAttendanceView user={user} />,
     pending: <MyPendingView user={user} />,
     certificates: <CertificatesView user={user} certificates={certificates} />,

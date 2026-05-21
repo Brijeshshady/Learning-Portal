@@ -74,7 +74,8 @@ async function seedDatabase() {
             { id: 'u0', email: 'superadmin@21stc.com', password: 'password123', role: 'admin', name: 'Super Admin', schoolId: null },
             { id: 'u5', email: 'hubadmin@21stc.com', password: 'password123', role: 'school-admin', name: 'Chennai Hub Admin', schoolId: 'HUB-CH-01' },
             { id: 'u3', email: 'teacher@21stc.com', password: 'password123', role: 'teacher', name: 'Ms. Kavitha', schoolId: 'HUB-CH-01', grades: [6, 7] },
-            { id: 'u4', email: 'student@21stc.com', password: 'password123', role: 'student', name: 'Arun Kumar', schoolId: 'HUB-CH-01', grade: 7 }
+            { id: 'u1', email: 'student@21stc.com', password: 'password123', role: 'student', name: 'Arun Kumar', schoolId: 'HUB-CH-01', grade: 7 },
+            { id: 'u2', email: 'student2@21stc.com', password: 'password123', role: 'student', name: 'Priya Selvi', schoolId: 'HUB-CH-01', grade: 8 }
         ];
         
         for (const u of users) {
@@ -83,11 +84,14 @@ async function seedDatabase() {
                 await User.create(u);
             } else {
                 // Force update demo credentials to match aligned list
+                exists.id = u.id;
                 exists.email = u.email;
                 exists.name = u.name;
                 exists.role = u.role;
                 exists.schoolId = u.schoolId;
                 exists.password = u.password; // Trigger re-hash via pre-save hook
+                if (u.grades) exists.grades = u.grades;
+                if (u.grade) exists.grade = u.grade;
                 await exists.save();
             }
         }
@@ -134,6 +138,45 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// Auth registration
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { name, email, password, role, schoolId, grade } = req.body;
+        const exists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (exists) {
+            return res.status(400).json({ error: 'A user with this email already exists' });
+        }
+        
+        // Generate custom id
+        const id = `u${Date.now()}`;
+        
+        const user = await User.create({
+            id,
+            name,
+            email,
+            password,
+            role: role || 'student',
+            schoolId: schoolId || null,
+            grade: grade || 6,
+            status: 'active'
+        });
+        
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
+        res.status(201).json({
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                name: user.name,
+                schoolId: user.schoolId,
+                token: token
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Protected routes
 app.get('/api/users', protect, async (req, res) => {
     try {
@@ -150,11 +193,246 @@ app.get('/api/users', protect, async (req, res) => {
     }
 });
 
-app.get('/api/users/:email', protect, async (req, res) => {
+// Lookup user by email (must be declared before dynamic /:id routes)
+app.get('/api/users/by-email/:email', protect, async (req, res) => {
     try {
-        const user = await User.findOne({ email: req.params.email }).select('-password');
+        const user = await User.findOne({ email: decodeURIComponent(req.params.email) }).select('-password');
         if (!user) return res.status(404).json({ error: 'User not found' });
         res.json(user);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/users', protect, authorize('admin', 'school-admin'), async (req, res) => {
+    try {
+        const { name, email, password, role, schoolId, grade, status } = req.body;
+        const exists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (exists) {
+            return res.status(400).json({ error: 'A user with this email already exists' });
+        }
+        
+        // School-admin can only create users in their own school
+        if (req.user.role === 'school-admin' && schoolId !== req.user.schoolId) {
+            return res.status(403).json({ error: 'Not authorized to create users for another school' });
+        }
+        
+        const id = `u${Date.now()}`;
+        const user = await User.create({
+            id,
+            name,
+            email,
+            password: password || 'password123',
+            role,
+            schoolId: schoolId || null,
+            grade: role === 'student' ? (grade || 6) : null,
+            status: status || 'active'
+        });
+        
+        const userRes = user.toObject();
+        delete userRes.password;
+        res.status(201).json(userRes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/users/:id', protect, async (req, res) => {
+    try {
+        const { name, email, role, schoolId, grade, status, password } = req.body;
+        const user = await User.findOne({ id: req.params.id });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        // Authorization check
+        if (req.user.role !== 'admin') {
+            if (req.user.role === 'school-admin') {
+                if (user.schoolId !== req.user.schoolId || (schoolId && schoolId !== req.user.schoolId)) {
+                    return res.status(403).json({ error: 'Not authorized to modify this user' });
+                }
+            } else {
+                // Regular user can only modify self
+                if (user.id !== req.user.id) {
+                    return res.status(403).json({ error: 'Not authorized to modify this user' });
+                }
+            }
+        }
+        
+        if (name) user.name = name;
+        if (email) user.email = email;
+        if (role && req.user.role === 'admin') user.role = role; // only superadmin can change roles
+        if (schoolId !== undefined && (req.user.role === 'admin' || req.user.role === 'school-admin')) user.schoolId = schoolId;
+        if (grade !== undefined) user.grade = grade;
+        if (status && (req.user.role === 'admin' || req.user.role === 'school-admin')) user.status = status;
+        if (password) user.password = password; // pre-save will hash
+        
+        await user.save();
+        const userRes = user.toObject();
+        delete userRes.password;
+        res.json(userRes);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/users/:id', protect, authorize('admin', 'school-admin'), async (req, res) => {
+    try {
+        const user = await User.findOne({ id: req.params.id });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        if (req.user.role === 'school-admin' && user.schoolId !== req.user.schoolId) {
+            return res.status(403).json({ error: 'Not authorized to delete this user' });
+        }
+        
+        if (user.email === 'superadmin@21stc.com') {
+            return res.status(400).json({ error: 'Cannot delete the primary Super Admin account' });
+        }
+        
+        await User.deleteOne({ id: req.params.id });
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+app.get('/api/dashboard/stats', protect, async (req, res) => {
+    try {
+        const { role, id } = req.query;
+        
+        // Base dashboard stats structures (mirrors client-side db.js stats template)
+        const studentStats = {
+            kpis: { progress: '65%', progressChange: '+8%', week: '7/36', weekChange: '+1 week', mastery: '72%', masteryChange: '+5%', score: 82, scoreChange: '+12' },
+            weeklyData: [{ name: 'Wk1', score: 88 }, { name: 'Wk2', score: 76 }, { name: 'Wk3', score: 91 }, { name: 'Wk4', score: 65 }, { name: 'Wk5', score: 82 }, { name: 'Wk6', score: 95 }, { name: 'Wk7', score: 70 }],
+            skillData: [{ name: 'AI', score: 72 }, { name: 'Coding', score: 88 }, { name: 'Logic', score: 45 }, { name: 'Problem', score: 92 }],
+            baseActivities: [
+                { name: 'Week 6 Assignment', action: 'Submitted — Neural Network Basics', time: '2h ago', tag: 'now', avatar: '✓', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
+                { name: 'Week 7 Unlocked', action: 'You unlocked the Neural Logic module', time: 'Today', tag: 'recent', avatar: '🔓', avatarBg: 'bg-primary/20', avatarColor: 'text-primary' },
+                { name: 'AI Lab Quiz', action: 'Score: 88/100 — Great work!', time: 'Yesterday', tag: 'older', avatar: 'Q', avatarBg: 'bg-secondary/20', avatarColor: 'text-secondary' },
+                { name: 'Roadmap Milestone', action: 'Phase 1 complete — Foundations done', time: '3 days ago', tag: 'older', avatar: '🏆', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' }
+            ]
+        };
+
+        const teacherStats = {
+            kpis: { avgProgress: '42%', progressChange: '+5%', atRisk: 8, atRiskChange: '-2', reviews: 24, reviewsChange: '+6', topSkill: 'Logic', topSkillScore: '88%' },
+            weekTrendData: [{ name: 'Wk1', pct: 95 }, { name: 'Wk2', pct: 82 }, { name: 'Wk3', pct: 78 }, { name: 'Wk4', pct: 40 }, { name: 'Wk5', pct: 55 }, { name: 'Wk6', pct: 62 }, { name: 'Wk7', pct: 42 }],
+            gradeBar: [{ name: 'Gr 6', score: 88 }, { name: 'Gr 7', score: 72 }, { name: 'Gr 8', score: 54 }, { name: 'Gr 9', score: 31 }],
+            activities: [
+                { name: 'Arun Kumar', action: 'Submitted AI Assignment', time: '10m ago', tag: 'now', avatar: 'A', avatarBg: 'bg-blue-500/20', avatarColor: 'text-blue-400' },
+                { name: 'System Alert', action: '3 students flagged for review', time: '1h ago', tag: 'recent', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' },
+                { name: 'Priya Selvi', action: 'Achieved 100% in Logic Quiz', time: '3h ago', tag: 'older', avatar: 'P', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' }
+            ]
+        };
+
+        const schoolAdminStats = {
+            kpis: { activeStudents: '1,420', studentsChange: '+12%', avgAttendance: '94%', attendanceChange: '+2.1%', completionRate: '68%', completionChange: '+5%', activeTeachers: 42, teachersChange: '0' },
+            hubTrendData: [{ name: 'Mon', active: 1200 }, { name: 'Tue', active: 1350 }, { name: 'Wed', active: 1410 }, { name: 'Thu', active: 1380 }, { name: 'Fri', active: 1420 }],
+            gradeDistData: [{ name: 'Grade 6', val: 400 }, { name: 'Grade 7', val: 520 }, { name: 'Grade 8', val: 380 }, { name: 'Grade 9', val: 120 }],
+            alerts: [
+                { name: 'Capacity Warning', action: 'Grade 7 AI Lab reaching limit', time: 'Just now', tag: 'now', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
+                { name: 'Hardware Sync', action: '24 IoT kits offline in Wing B', time: '2h ago', tag: 'recent', avatar: '⚡', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' },
+                { name: 'New Enrollment', action: '15 new students onboarded', time: 'Yesterday', tag: 'older', avatar: '+', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' }
+            ],
+            hubLoadMetrics: {
+                aiQuotaUsed: 14245,
+                aiQuotaLimit: 20000,
+                activeClients: 342,
+                maxClients: 500,
+                routerCpu: 42,
+                routerMem: 58,
+                iotStatus: { online: 58, total: 60 }
+            }
+        };
+
+        const adminStats = {
+            kpis: { activeHubs: 12, hubsChange: '+2', totalStudents: '45.2K', studentsChange: '+15%', systemUptime: '99.9%', uptimeChange: '+0.1%', mrr: '$124K', mrrChange: '+8%' },
+            enrollmentData: [{ name: 'Jan', value: 820 }, { name: 'Feb', value: 932 }, { name: 'Mar', value: 1100 }, { name: 'Apr', value: 1450 }, { name: 'May', value: 1800 }, { name: 'Jun', value: 2400 }, { name: 'Jul', value: 3200 }],
+            performanceData: [
+                { name: 'Node A (Chennai Core)', cpu: 45, mem: 60, connections: 840, latency: 12, disk: 18, status: 'healthy' },
+                { name: 'Node B (Coimbatore Core)', cpu: 75, mem: 82, connections: 1202, latency: 38, disk: 44, status: 'warning' },
+                { name: 'Node C (Regional Router)', cpu: 30, mem: 45, connections: 450, latency: 15, disk: 12, status: 'healthy' },
+                { name: 'DB Sync (Master Node)', cpu: 88, mem: 95, connections: 345, latency: 45, disk: 78, status: 'critical' }
+            ],
+            aiUsageStats: {
+                totalRequests: 84293,
+                totalTokens: 14283921,
+                costSavingsPct: 92,
+                averageLatencyMs: 142,
+                keysStatus: [
+                    { slot: 1, key: 'AIzaSyBW...tYx1', limit: 200, used: 142, rate: '71%', status: 'active' },
+                    { slot: 2, key: 'AIzaSyAS...uR88', limit: 200, used: 198, rate: '99%', status: 'active' },
+                    { slot: 3, key: 'AIzaSyKP...xX90', limit: 200, used: 45,  rate: '22%', status: 'active' },
+                    { slot: 4, key: 'AIzaSyTR...kP12', limit: 200, used: 0,   rate: '0%',  status: 'active' },
+                    { slot: 5, key: 'AIzaSyLM...uV34', limit: 200, used: 0,   rate: '0%',  status: 'suspended' }
+                ]
+            },
+            activities: [
+                { name: 'System Update', action: 'v2.4.1 deployed successfully', time: '10m ago', tag: 'now', avatar: '↑', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
+                { name: 'New Hub', action: 'Hub-BLR-04 initialized', time: '2h ago', tag: 'recent', avatar: '+', avatarBg: 'bg-blue-500/20', avatarColor: 'text-blue-400' },
+                { name: 'Security Alert', action: 'Failed login spikes (blocked)', time: '5h ago', tag: 'older', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' }
+            ]
+        };
+
+        if (role === 'admin') {
+            const activeHubs = await School.countDocuments();
+            const totalStudents = await User.countDocuments({ role: 'student' });
+            adminStats.kpis.activeHubs = activeHubs;
+            adminStats.kpis.totalStudents = totalStudents.toLocaleString();
+            return res.json(adminStats);
+        }
+        
+        if (role === 'school-admin') {
+            const schoolId = id || req.user.schoolId;
+            const activeStudents = await User.countDocuments({ schoolId, role: 'student' });
+            const activeTeachers = await User.countDocuments({ schoolId, role: 'teacher' });
+            
+            const grade6 = await User.countDocuments({ schoolId, role: 'student', grade: 6 });
+            const grade7 = await User.countDocuments({ schoolId, role: 'student', grade: 7 });
+            const grade8 = await User.countDocuments({ schoolId, role: 'student', grade: 8 });
+            const grade9 = await User.countDocuments({ schoolId, role: 'student', grade: 9 });
+
+            schoolAdminStats.kpis.activeStudents = activeStudents.toLocaleString();
+            schoolAdminStats.kpis.activeTeachers = activeTeachers;
+            schoolAdminStats.gradeDistData = [
+                { name: 'Grade 6', val: grade6 },
+                { name: 'Grade 7', val: grade7 },
+                { name: 'Grade 8', val: grade8 },
+                { name: 'Grade 9', val: grade9 }
+            ];
+            return res.json(schoolAdminStats);
+        }
+        
+        if (role === 'teacher') {
+            const schoolId = req.user.schoolId;
+            const activeStudents = await User.countDocuments({ schoolId, role: 'student' });
+            
+            // Calculate average progress from Progress model
+            const students = await User.find({ schoolId, role: 'student' });
+            const studentIds = students.map(s => s.id);
+            const progresses = await Progress.find({ userId: { $in: studentIds } });
+            let avgProgressPct = 0;
+            if (progresses.length > 0) {
+                const totalCompleted = progresses.reduce((sum, p) => sum + (p.completedWeeks ? p.completedWeeks.length : 0), 0);
+                avgProgressPct = Math.round((totalCompleted / (progresses.length * 36)) * 100);
+            } else {
+                avgProgressPct = 42; // default fallback
+            }
+
+            teacherStats.kpis.avgProgress = `${avgProgressPct}%`;
+            teacherStats.kpis.reviews = await User.countDocuments({ schoolId, role: 'student', status: 'inactive' });
+            
+            return res.json(teacherStats);
+        }
+        
+        if (role === 'student') {
+            const studentId = id || req.user.id;
+            const progress = await Progress.findOne({ userId: studentId });
+            const completedWeeksCount = progress ? (progress.completedWeeks ? progress.completedWeeks.length : 0) : 0;
+            const progressPct = Math.round((completedWeeksCount / 36) * 100);
+            
+            studentStats.kpis.progress = `${progressPct}%`;
+            studentStats.kpis.week = `${progress ? progress.currentWeek : 1}/36`;
+            return res.json(studentStats);
+        }
+
+        res.status(400).json({ error: 'Invalid role for dashboard statistics request' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

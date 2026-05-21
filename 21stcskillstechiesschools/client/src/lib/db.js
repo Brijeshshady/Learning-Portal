@@ -107,10 +107,23 @@ const DB = {
     }
   },
 
+  register: async ({ name, email, password, role, schoolId, grade }) => {
+    console.log('[DB] Registering new user:', email);
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, role: role || 'student', schoolId: schoolId || null, grade: grade || 6 }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    console.log('[DB] Registration success');
+    return data.user; // { id, name, email, role, schoolId, token }
+  },
+
   // ─── USERS ─────────────────────────────────────────────────────────────────
   getUser: async (email) => {
     try {
-      const res = await fetch(`${API_BASE}/users/${encodeURIComponent(email)}`, {
+      const res = await fetch(`${API_BASE}/users/by-email/${encodeURIComponent(email)}`, {
         headers: getAuthHeaders()
       });
       if (res.ok) return await res.json();
@@ -129,7 +142,7 @@ const DB = {
     return [
       { id: 'u1', name: 'Arun Kumar',    role: 'student', grade: 7,  schoolId },
       { id: 'u2', name: 'Priya Selvi',   role: 'student', grade: 8,  schoolId },
-      { id: 'u4', name: 'Ms. Kavitha',   role: 'teacher', grades: [6, 7, 8], schoolId },
+      { id: 'u3', name: 'Ms. Kavitha',   role: 'teacher', grades: [6, 7, 8], schoolId },
     ];
   },
 
