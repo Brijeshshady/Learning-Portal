@@ -52,7 +52,7 @@ Welcome to the **21st Century Skills Learning Portal**, a premium, state-of-the-
 ### 2. Clone and Setup Environment Variables
 Configure the `.env` file in the root directory:
 ```env
-PORT=5000
+PORT=8102
 MONGODB_URI=mongodb+srv://your_connection_string
 JWT_SECRET=your_jwt_secret_token
 
