@@ -473,6 +473,78 @@ const DB = {
     } catch { /* fall through */ }
     return null;
   },
+
+  // ── CODE PLAYGROUND API ──────────────────────────────────────────────────
+  executeCode: async (code, language, action) => {
+    const res = await fetch(`${API_BASE}/ai/execute-code`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ code, language, action })
+    });
+    return await res.json();
+  },
+
+  // ── ROLLOUTS API ─────────────────────────────────────────────────────────
+  getRollouts: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/rollouts`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return [];
+  },
+
+  createRollout: async (rolloutData) => {
+    const res = await fetch(`${API_BASE}/rollouts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(rolloutData)
+    });
+    return await res.json();
+  },
+
+  updateRolloutStatus: async (rolloutId, status) => {
+    const res = await fetch(`${API_BASE}/rollouts/${encodeURIComponent(rolloutId)}/status`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status })
+    });
+    return await res.json();
+  },
+
+  getPendingRollout: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/rollouts/pending`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return { pending: false };
+  },
+
+  // ── BUG REPORTS API ──────────────────────────────────────────────────────
+  submitBug: async (bugData) => {
+    const res = await fetch(`${API_BASE}/bugs`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(bugData)
+    });
+    return await res.json();
+  },
+
+  getBugs: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/bugs`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return [];
+  },
+
+  updateBugStatus: async (bugId, status) => {
+    const res = await fetch(`${API_BASE}/bugs/${encodeURIComponent(bugId)}/status`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status })
+    });
+    return await res.json();
+  },
 };
 
 // Keep window.DB for legacy compatibility (db.js is also still present)

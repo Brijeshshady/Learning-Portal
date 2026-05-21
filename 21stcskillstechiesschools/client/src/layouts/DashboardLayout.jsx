@@ -1,11 +1,13 @@
 import React from 'react';
 import { Outlet, useSearchParams } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { Search, Bell, Settings, CheckCircle2, LogOut, AlertTriangle } from 'lucide-react';
+import { Search, Bell, Settings, CheckCircle2, LogOut, AlertTriangle, Bug, ArrowUpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import ToastContainer from '../components/ToastContainer';
 import SettingsModal from '../components/SettingsModal';
+import BugReportModal from '../components/BugReportModal';
+import DB from '../lib/db';
 import useStore from '../hooks/useStore';
 import { markAllRead, markRead } from '../lib/store';
 import AIChatWidget from '../components/AIChatWidget';
@@ -21,6 +23,8 @@ const VIEW_TITLES = {
     attendance:'System Attendance',
     analytics: 'Platform Analytics',
     system:    'System Monitor',
+    rollouts:  'Rollout Manager',
+    bugs:      'Bug Tracker',
   },
   'school-admin': {
     overview:  'Institution Overview',
@@ -29,6 +33,7 @@ const VIEW_TITLES = {
     pending:   'Hub Pending Actions',
     certificates: 'Hub Certificates',
     analytics: 'Institution Reports',
+    'rollout-log': 'System Updates',
   },
   teacher: {
     overview:    'Class Overview',
@@ -42,6 +47,7 @@ const VIEW_TITLES = {
   student: {
     overview: 'My Dashboard',
     'ai-lab': 'AI Innovation Lab',
+    playground: 'Coding Playground',
     projects: 'My Projects',
     attendance: 'My Attendance',
     pending: 'My Pending',
@@ -63,6 +69,9 @@ const DashboardLayout = () => {
   const [searchParams] = useSearchParams();
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [showBugModal, setShowBugModal] = React.useState(false);
+  const [pendingRollout, setPendingRollout] = React.useState(null);
+  const [showRolloutBanner, setShowRolloutBanner] = React.useState(true);
   const { notifications, maintenanceMode, hubs = [] } = useStore();
   
   const myNotifications = notifications.filter(n => {
@@ -74,6 +83,19 @@ const DashboardLayout = () => {
   const unreadCount = myNotifications.filter(n => !n.read).length;
 
   const role      = user?.role || 'student';
+
+  React.useEffect(() => {
+    if (role === 'school-admin') {
+      DB.getPendingRollout()
+        .then(res => {
+          if (res && res.pending) {
+            setPendingRollout(res.rollout);
+          }
+        })
+        .catch(err => console.error('Failed to load pending rollout', err));
+    }
+  }, [role]);
+
   const titles    = VIEW_TITLES[role] || {};
   const defaultV  = Object.keys(titles)[0] || 'overview';
   const activeView = searchParams.get('v') || defaultV;
@@ -222,6 +244,15 @@ const DashboardLayout = () => {
               </AnimatePresence>
             </div>
 
+            {/* Bug Report */}
+            <button 
+              onClick={() => setShowBugModal(true)}
+              className="w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-400 transition-colors rounded-xl hover:bg-red-500/10"
+              title="Submit Bug Report"
+            >
+              <Bug className="w-4 h-4" />
+            </button>
+
             {/* Settings */}
             <button 
               onClick={() => setShowSettings(true)}
@@ -245,9 +276,26 @@ const DashboardLayout = () => {
         </header>
 
         {/* ── Page Content ───────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto bg-background relative">
+        <main className="flex-1 overflow-y-auto bg-background relative flex flex-col">
           <div className="bg-grid-pattern absolute inset-0 opacity-30 pointer-events-none"></div>
-          <div className="relative z-10 p-8 max-w-screen-xl mx-auto">
+          {pendingRollout && showRolloutBanner && (
+            <div className="relative z-20 bg-amber-500/10 border-b border-amber-500/20 backdrop-blur-md px-6 py-3 flex items-center justify-between text-xs text-amber-250 shrink-0">
+              <div className="flex items-center gap-2 font-semibold">
+                <ArrowUpCircle className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
+                <span>
+                  Update <strong className="text-white">{pendingRollout.version} ({pendingRollout.channel})</strong> is available. 
+                  It will be automatically applied next midnight (tomorrow at <strong className="text-white">{new Date(pendingRollout.scheduledAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong>).
+                </span>
+              </div>
+              <button 
+                onClick={() => setShowRolloutBanner(false)}
+                className="text-amber-500 hover:text-white font-black uppercase tracking-widest text-[9px] px-2.5 py-1 rounded bg-amber-500/5 hover:bg-amber-500/20 transition-all border border-amber-500/10"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+          <div className="relative z-10 p-8 max-w-screen-xl mx-auto w-full flex-1">
             <Outlet />
           </div>
         </main>
@@ -256,6 +304,7 @@ const DashboardLayout = () => {
       {/* Global Toasts, Modals & AI */}
       <ToastContainer />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} user={user} />
+      <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
       <AIChatWidget />
     </div>
   );

@@ -23,9 +23,14 @@ import {
   Inbox,
   Trophy,
   Cpu,
+  Code2,
+  Bug,
+  ArrowUpCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useStore from '../hooks/useStore';
+import BugReportModal from './BugReportModal';
+import DB from '../lib/db';
 
 /* ─── Per-role navigation configs ──────────────────────────────────────────────
    Each item either goes to an external route OR drives an internal "view"
@@ -45,6 +50,9 @@ const MENUS = {
       { name: 'Analytics',     view: 'analytics', icon: Activity },
       { name: 'Exam Analytics', view: 'exam-analytics', icon: ClipboardList },
       { name: 'System Monitor', view: 'system',    icon: Cpu },
+      { name: 'Rollouts',       view: 'rollouts',  icon: Rocket },
+      { name: 'Bug Tracker',   view: 'bugs',      icon: Bug },
+      { name: 'Submit Bug',     view: 'submit-bug', icon: Bug },
       { name: 'Community',     route: '/community', icon: MessageSquare },
     ],
   },
@@ -59,6 +67,8 @@ const MENUS = {
       { name: 'Certificates', view: 'certificates', icon: Award },
       { name: 'Reports',      view: 'analytics',  icon: BarChart2 },
       { name: 'Exam Analytics', view: 'exam-analytics', icon: ClipboardList },
+      { name: 'System Updates', view: 'rollout-log', icon: Rocket },
+      { name: 'Submit Bug',     view: 'submit-bug', icon: Bug },
       { name: 'Community',    route: '/community', icon: MessageSquare },
     ],
   },
@@ -74,6 +84,7 @@ const MENUS = {
       { name: 'Manage Exams',    view: 'exams',        icon: ClipboardList },
       { name: 'Certificates',    view: 'certificates', icon: Award },
       { name: 'Syllabus View',   view: 'curriculum',   icon: BookOpen },
+      { name: 'Submit Bug',      view: 'submit-bug',   icon: Bug },
       { name: 'Community',       route: '/community',  icon: MessageSquare },
     ],
   },
@@ -84,12 +95,14 @@ const MENUS = {
       { name: 'Dashboard',        view: 'overview',  icon: LayoutDashboard },
       { name: 'Exams',            view: 'exams',     icon: ClipboardList },
       { name: 'AI Lab',           view: 'ai-lab',    icon: Bot },
+      { name: 'Code Playground',  view: 'playground', icon: Code2 },
       { name: 'My Projects',      view: 'projects',  icon: Rocket },
       { name: 'Attendance',       view: 'attendance', icon: Calendar },
       { name: 'My Pending',       view: 'pending',    icon: Inbox, badge: true },
       { name: 'Weekly Roadmap',   view: 'roadmap',   icon: Zap },
       { name: 'Certificates',     view: 'certificates', icon: Award },
       { name: 'Leaderboard',      view: 'leaderboard',   icon: Trophy },
+      { name: 'Submit Bug',       view: 'submit-bug',   icon: Bug },
       { name: 'Community',        route: '/community', icon: MessageSquare },
       { name: 'Support',          view: 'support',   icon: HelpCircle },
     ],
@@ -107,17 +120,44 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const { submissions = [], grades = {}, leaves = [] } = useStore();
+  const { submissions = [], grades = {}, leaves = [], hubs = [] } = useStore();
+  const [showBugModal, setShowBugModal] = React.useState(false);
+  const [pendingRollout, setPendingRollout] = React.useState(null);
 
   const role   = user?.role || 'student';
   const config = MENUS[role] || MENUS.student;
-  const { accent, label, links } = config;
+  const { accent, label } = config;
+  let links = [...config.links];
+
+  // Find user's school limits
+  const userHub = hubs.find(h => h.id === user?.schoolId);
+  const playgroundEnabled = userHub?.featureLimits?.playgroundEnabled !== false;
+
+  if (role === 'student') {
+    links = links.filter(item => {
+      if (item.view === 'playground') return playgroundEnabled;
+      return true;
+    });
+  }
 
   const baseRoute  = ROUTE_FOR_ROLE[role];
   const isOnMyBase = location.pathname === baseRoute;
   const activeView = searchParams.get('v') || links[0]?.view;
 
   const navigate = useNavigate();
+
+  // Load pending rollout status for school admin
+  React.useEffect(() => {
+    if (role === 'school-admin') {
+      DB.getPendingRollout()
+        .then(res => {
+          if (res && res.pending) {
+            setPendingRollout(res.rollout);
+          }
+        })
+        .catch(err => console.error('Failed to load pending rollout', err));
+    }
+  }, [role]);
 
   // Live pending count for teacher & student & school-admin badges
   const pendingSubsCount   = submissions.filter(s => !grades[s.id]).length;
@@ -130,6 +170,10 @@ const Sidebar = () => {
   const myTotalPending = myPendingSubsCount + myPendingLeavesCount;
 
   const handleViewClick = (item) => {
+    if (item.view === 'submit-bug') {
+      setShowBugModal(true);
+      return;
+    }
     // Items with a `route` go to a full page path
     if (item.route) {
       navigate(item.route);
@@ -149,18 +193,31 @@ const Sidebar = () => {
   return (
     <aside className="w-64 shrink-0 h-screen bg-surface border-r border-outline-variant flex flex-col z-30">
       {/* ── Branding ─────────────────────────────────────────────────────── */}
-      <div className="px-5 py-5 border-b border-outline-variant flex items-center gap-3 shrink-0">
-        <div className={`w-9 h-9 ${accent.bg} rounded-xl flex items-center justify-center shadow-lg ${accent.shadow} shrink-0`}>
-          <LayoutDashboard className="text-white w-4 h-4" />
+      <div className="px-5 py-5 border-b border-outline-variant flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 ${accent.bg} rounded-xl flex items-center justify-center shadow-lg ${accent.shadow} shrink-0`}>
+            <LayoutDashboard className="text-white w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-black text-[15px] font-headline tracking-tight text-white leading-none">
+              21stc <span className={accent.text}>{label}</span>
+            </p>
+            <p className={`text-[9px] font-black uppercase tracking-[0.25em] ${accent.text} opacity-70 mt-0.5`}>
+              {role.replace('-', ' ')}
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="font-black text-[15px] font-headline tracking-tight text-white leading-none">
-            21stc <span className={accent.text}>{label}</span>
-          </p>
-          <p className={`text-[9px] font-black uppercase tracking-[0.25em] ${accent.text} opacity-70 mt-0.5`}>
-            {role.replace('-', ' ')}
-          </p>
-        </div>
+
+        {pendingRollout && (
+          <button 
+            onClick={() => setSearchParams({ v: 'rollout-log' })}
+            className="w-8 h-8 flex items-center justify-center bg-amber-500/10 border border-amber-500/20 rounded-xl hover:bg-amber-500 hover:text-black transition-all animate-pulse relative"
+            title={`New update ${pendingRollout.version} available — Click to view`}
+          >
+            <ArrowUpCircle className="w-4 h-4 text-amber-400 hover:text-inherit" />
+            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+          </button>
+        )}
       </div>
 
       {/* ── Nav Links ────────────────────────────────────────────────────── */}
@@ -226,6 +283,8 @@ const Sidebar = () => {
           </button>
         </div>
       </div>
+
+      <BugReportModal isOpen={showBugModal} onClose={() => setShowBugModal(false)} />
     </aside>
   );
 };

@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   Users, ShieldCheck, Key, BarChart3, PlusCircle, Upload,
   Search, Database, Activity, BadgeCheck, Settings as SettingsIcon,
-  TrendingUp, Download, Copy, AlertTriangle, Cpu, CheckCircle2, AlertCircle, Award, Trash2, Calendar, Lock, UserCheck, FileText, MapPin, Zap, Server, HardDrive
+  TrendingUp, Download, Copy, AlertTriangle, Cpu, CheckCircle2, AlertCircle, Award, Trash2, Calendar, Lock, UserCheck, FileText, MapPin, Zap, Server, HardDrive,
+  Rocket, Bug
 } from 'lucide-react';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -13,7 +14,7 @@ import {
 } from '../components/DashboardShell';
 import Modal from '../components/Modal';
 import useStore from '../hooks/useStore';
-import { addUser, removeUser, updateUser, addHub, updateHub, removeHub, exportCSV, generateLicenseKey, addNotification, setMaintenanceMode, setHubMaintenance, getState, markAttendance } from '../lib/store';
+import { addUser, removeUser, updateUser, addHub, updateHub, removeHub, exportCSV, generateLicenseKey, addNotification, setMaintenanceMode, setHubMaintenance, getState, markAttendance, setHubs } from '../lib/store';
 import DB from '../lib/db';
 import ExamAnalytics from './ExamAnalytics';
 
@@ -573,6 +574,21 @@ const UsersView = () => {
     }
   };
 
+  const handleExport = () => {
+    exportCSV(
+      filteredUsers.map(u => ({
+        ID: u.id,
+        Name: u.name,
+        Email: u.email,
+        Role: u.role,
+        Hub: u.schoolId || 'N/A',
+        Status: u.status || 'active',
+        Grade: u.grade || 'N/A'
+      })),
+      'users_export.csv'
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -755,16 +771,33 @@ const HubRegistryView = () => {
   const { hubs, users } = useStore();
   const [editingHub, setEditingHub] = React.useState(null);
   const [showModal, setShowModal] = React.useState(false);
+
+  const DEFAULT_LIMITS = {
+    plan: 'Basic',
+    studentLimit: 3000,
+    aiLimit: 20000,
+    examLimit: 50,
+    storageLimit: 10,
+    playgroundEnabled: true,
+    certificateLimit: 200,
+    communityAccess: true
+  };
+
   const [formData, setFormData] = React.useState({ 
-    id: '', name: '', loc: '', mapsLink: '', status: 'active', studentLimit: 1000,
-    mActive: false, mUntil: '', mMessage: '' 
+    id: '', name: '', loc: '', mapsLink: '', status: 'active', 
+    mActive: false, mUntil: '', mMessage: '',
+    ...DEFAULT_LIMITS
   });
 
   const getStudentCount = (hubId) => users.filter(u => u.schoolId === hubId && u.role === 'student').length;
 
   const handleOpenAdd = () => {
     setEditingHub(null);
-    setFormData({ id: '', name: '', loc: '', mapsLink: '', status: 'active', studentLimit: 1000, mActive: false, mUntil: '', mMessage: '' });
+    setFormData({ 
+      id: '', name: '', loc: '', mapsLink: '', status: 'active', 
+      mActive: false, mUntil: '', mMessage: '',
+      ...DEFAULT_LIMITS
+    });
     setShowModal(true);
   };
 
@@ -773,10 +806,17 @@ const HubRegistryView = () => {
     setFormData({ 
       id: hub.id, 
       name: hub.name, 
-      loc: hub.location || hub.loc, 
+      loc: hub.location || hub.loc || '', 
       mapsLink: hub.mapsLink || '',
       status: hub.status || 'active', 
-      studentLimit: hub.studentLimit || 1000,
+      plan: hub.plan || 'Basic',
+      studentLimit: hub.studentLimit || 3000,
+      aiLimit: hub.aiLimit || 20000,
+      examLimit: hub.featureLimits?.examLimit ?? 50,
+      storageLimit: hub.featureLimits?.storageLimit ?? 10,
+      playgroundEnabled: hub.featureLimits?.playgroundEnabled ?? true,
+      certificateLimit: hub.featureLimits?.certificateLimit ?? 200,
+      communityAccess: hub.featureLimits?.communityAccess ?? true,
       mActive: hub.maintenance?.active || false,
       mUntil: hub.maintenance?.until || '',
       mMessage: hub.maintenance?.message || ''
@@ -784,27 +824,57 @@ const HubRegistryView = () => {
     setShowModal(true);
   };
 
-  const handleSaveHub = (e) => {
+  const resetToDefaults = () => {
+    setFormData(prev => ({
+      ...prev,
+      ...DEFAULT_LIMITS
+    }));
+  };
+
+  const handleSaveHub = async (e) => {
     e.preventDefault();
     const hubData = { 
       name: formData.name, 
       location: formData.loc,
-      mapsLink: formData.mapsLink.trim() || null,
+      mapsLink: formData.mapsLink?.trim() || null,
       status: formData.status, 
+      plan: formData.plan,
       studentLimit: Number(formData.studentLimit),
+      aiLimit: Number(formData.aiLimit),
       maintenance: {
         active: formData.mActive,
         until: formData.mUntil,
         message: formData.mMessage
+      },
+      featureLimits: {
+        examLimit: Number(formData.examLimit),
+        storageLimit: Number(formData.storageLimit),
+        playgroundEnabled: formData.playgroundEnabled,
+        certificateLimit: Number(formData.certificateLimit),
+        communityAccess: formData.communityAccess
       }
     };
 
-    if (editingHub) {
-      updateHub(editingHub.id, hubData);
-      addNotification({ title: 'Hub Updated', body: `${formData.name} configuration updated.`, type: 'success' });
-    } else {
-      addHub({ id: formData.id, ...hubData });
-      addNotification({ title: 'Hub Created', body: `${formData.name} added to the registry.`, type: 'success' });
+    try {
+      const res = await DB.updateSchool(formData.id, hubData);
+      if (res && !res.error) {
+        addNotification({ 
+          title: editingHub ? 'Hub Updated' : 'Hub Created', 
+          body: `${formData.name} configuration saved successfully.`, 
+          type: 'success' 
+        });
+        const schools = await DB.getSchools();
+        setHubs(schools);
+      } else {
+        addNotification({ 
+          title: 'Operation Failed', 
+          body: res?.error || 'Failed to save hub settings.', 
+          type: 'error' 
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      addNotification({ title: 'Operation Failed', body: err.message, type: 'error' });
     }
     setShowModal(false);
   };
@@ -871,6 +941,46 @@ const HubRegistryView = () => {
               </div>
               <div className="bg-zinc-800/60 rounded-xl p-4 text-center"><p className={`text-2xl font-black font-headline text-primary`}>{hub.completion || '0%'}</p><p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mt-1">Avg Completion</p></div>
             </div>
+
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Plan</p>
+                <p className="text-xs font-black text-white mt-0.5">{hub.plan || 'Basic'}</p>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">AI Limit</p>
+                <p className="text-xs font-bold text-white mt-0.5">{hub.aiLimit?.toLocaleString() || '0'}/mo</p>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Exams</p>
+                <p className="text-xs font-bold text-white mt-0.5">Max {hub.featureLimits?.examLimit || 50}</p>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Storage</p>
+                <p className="text-xs font-bold text-white mt-0.5">{hub.featureLimits?.storageLimit || 10} GB</p>
+              </div>
+            </div>
+            
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                hub.featureLimits?.playgroundEnabled ?? true 
+                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                  : 'text-zinc-500 bg-zinc-800/40 border-zinc-800'
+              }`}>
+                Playground: {hub.featureLimits?.playgroundEnabled ?? true ? 'Enabled' : 'Disabled'}
+              </span>
+              <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                hub.featureLimits?.communityAccess ?? true 
+                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                  : 'text-zinc-500 bg-zinc-800/40 border-zinc-800'
+              }`}>
+                Community: {hub.featureLimits?.communityAccess ?? true ? 'Active' : 'Locked'}
+              </span>
+              <span className="text-[8px] font-black text-zinc-500 bg-zinc-800/40 border border-zinc-800 px-2 py-0.5 rounded uppercase tracking-wider">
+                Certs: {hub.featureLimits?.certificateLimit || 200}/mo
+              </span>
+            </div>
+
           {/* Maps button if link exists */}
           {hub.mapsLink && (
             <a
@@ -910,6 +1020,109 @@ const HubRegistryView = () => {
               placeholder="https://maps.google.com/..."
             />
             <p className="text-[9px] text-zinc-600 font-medium mt-1 px-1">Paste the Google Maps share link or place URL for this hub location.</p>
+          </div>
+
+          <div className="pt-4 border-t border-zinc-800 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Feature Limits & Subscription
+              </h4>
+              <button 
+                type="button" 
+                onClick={resetToDefaults}
+                className="text-[9px] font-black text-zinc-500 hover:text-white uppercase tracking-widest transition-colors animate-pulse"
+              >
+                Reset to Defaults
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Plan</label>
+                <select 
+                  value={formData.plan} 
+                  onChange={(e) => setFormData({...formData, plan: e.target.value})}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                >
+                  <option value="Basic">Basic</option>
+                  <option value="Pro">Pro</option>
+                  <option value="Enterprise">Enterprise</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">AI Limit (req/mo)</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.aiLimit} 
+                  onChange={(e) => setFormData({...formData, aiLimit: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Max Exams/mo</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.examLimit} 
+                  onChange={(e) => setFormData({...formData, examLimit: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Storage (GB)</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.storageLimit} 
+                  onChange={(e) => setFormData({...formData, storageLimit: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Certs Limit/mo</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.certificateLimit} 
+                  onChange={(e) => setFormData({...formData, certificateLimit: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-zinc-800/40 rounded-xl border border-zinc-800">
+                <div>
+                  <p className="text-xs font-bold text-white">Coding Playground</p>
+                  <p className="text-[9px] text-zinc-500 font-medium">Enable student coding editor and sandboxed output runtime.</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setFormData({...formData, playgroundEnabled: !formData.playgroundEnabled})}
+                  className={`w-12 h-6 rounded-full transition-all relative ${formData.playgroundEnabled ? 'bg-primary' : 'bg-zinc-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${formData.playgroundEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-zinc-800/40 rounded-xl border border-zinc-800">
+                <div>
+                  <p className="text-xs font-bold text-white">Community Access</p>
+                  <p className="text-[9px] text-zinc-500 font-medium">Enable discussions and community collaboration portals.</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setFormData({...formData, communityAccess: !formData.communityAccess})}
+                  className={`w-12 h-6 rounded-full transition-all relative ${formData.communityAccess ? 'bg-primary' : 'bg-zinc-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${formData.communityAccess ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+            </div>
           </div>
           
           <div className="pt-4 border-t border-zinc-800 mt-4">
@@ -954,7 +1167,7 @@ const HubRegistryView = () => {
             </div>
           </div>
 
-          <button type="submit" className="w-full bg-primary text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">
+          <button type="submit" className="w-full bg-primary text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20 animate-pulse">
             {editingHub ? "Apply Hub Updates" : "Register Hub"}
           </button>
         </form>
@@ -1300,6 +1513,583 @@ const SchoolAttendanceView = () => {
   );
 };
 
+/* ── Rollout Manager View ────────────────────────────────── */
+const RolloutManagerView = () => {
+  const { hubs } = useStore();
+  const [rollouts, setRollouts] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [showForm, setShowForm] = React.useState(false);
+  const [formData, setFormData] = React.useState({
+    version: '',
+    title: '',
+    description: '',
+    channel: 'stable',
+    targetHubs: [],
+    scheduledDate: '',
+    scheduledTime: '23:59',
+    changelogRaw: ''
+  });
+
+  const fetchRollouts = async () => {
+    setLoading(true);
+    try {
+      const res = await DB.getRollouts();
+      if (res && !res.error) {
+        setRollouts(res);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchRollouts();
+  }, []);
+
+  const handleToggleHub = (hubId) => {
+    setFormData(prev => {
+      const exists = prev.targetHubs.includes(hubId);
+      if (exists) {
+        return { ...prev, targetHubs: prev.targetHubs.filter(id => id !== hubId) };
+      } else {
+        return { ...prev, targetHubs: [...prev.targetHubs, hubId] };
+      }
+    });
+  };
+
+  const handleCreateRollout = async (e) => {
+    e.preventDefault();
+    
+    // Parse scheduled datetime
+    let scheduledAt = null;
+    if (formData.scheduledDate) {
+      scheduledAt = new Date(`${formData.scheduledDate}T${formData.scheduledTime}`);
+    } else {
+      // Default to tomorrow midnight
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      scheduledAt = tomorrow;
+    }
+
+    const changelog = formData.changelogRaw
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    const payload = {
+      version: formData.version,
+      title: formData.title,
+      description: formData.description,
+      channel: formData.channel,
+      targetHubs: formData.targetHubs,
+      scheduledAt,
+      changelog
+    };
+
+    try {
+      const res = await DB.createRollout(payload);
+      if (res && !res.error) {
+        addNotification({
+          title: 'Rollout Scheduled',
+          body: `Version ${payload.version} rollout has been scheduled.`,
+          type: 'success'
+        });
+        setShowForm(false);
+        setFormData({
+          version: '',
+          title: '',
+          description: '',
+          channel: 'stable',
+          targetHubs: [],
+          scheduledDate: '',
+          scheduledTime: '23:59',
+          changelogRaw: ''
+        });
+        fetchRollouts();
+      } else {
+        addNotification({
+          title: 'Rollout Failed',
+          body: res?.error || 'Failed to schedule rollout.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      addNotification({
+        title: 'Error',
+        body: err.message,
+        type: 'error'
+      });
+    }
+  };
+
+  const handleUpdateStatus = async (rolloutId, status) => {
+    try {
+      const res = await DB.updateRolloutStatus(rolloutId, status);
+      if (res && !res.error) {
+        addNotification({
+          title: 'Rollout Updated',
+          body: `Rollout status set to ${status}.`,
+          type: 'success'
+        });
+        fetchRollouts();
+      } else {
+        addNotification({
+          title: 'Update Failed',
+          body: res?.error || 'Failed to update rollout status.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      addNotification({
+        title: 'Error',
+        body: err.message,
+        type: 'error'
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white flex items-center gap-2">
+            <Rocket className="w-6 h-6 text-primary" /> Version Rollout Manager
+          </h2>
+          <p className="text-zinc-500 text-sm mt-1">Deploy new update releases, configure rollout schedules, and track application across hubs.</p>
+        </div>
+        <button 
+          onClick={() => setShowForm(!showForm)} 
+          className="bg-primary text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-primary/20"
+        >
+          {showForm ? 'View Timeline' : 'Schedule Rollout'}
+        </button>
+      </div>
+
+      {showForm ? (
+        <SectionCard className="border border-zinc-800 bg-zinc-950/40 backdrop-blur-md">
+          <form onSubmit={handleCreateRollout} className="space-y-4">
+            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4 border-b border-zinc-850 pb-2">Create Scheduled Release</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Version Code</label>
+                <input 
+                  required 
+                  type="text" 
+                  value={formData.version} 
+                  onChange={(e) => setFormData({...formData, version: e.target.value})} 
+                  placeholder="e.g. v2.5.0"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Release Title</label>
+                <input 
+                  required 
+                  type="text" 
+                  value={formData.title} 
+                  onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                  placeholder="e.g. Interactive Code Playground Integration"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Release Summary</label>
+              <textarea 
+                value={formData.description} 
+                onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                placeholder="A brief overview of what this version update accomplishes..."
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50 h-20 resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Deployment Channel</label>
+                <select 
+                  value={formData.channel} 
+                  onChange={(e) => setFormData({...formData, channel: e.target.value})}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                >
+                  <option value="stable">Stable Release</option>
+                  <option value="beta">Beta Testing</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Scheduled Date (Midnight Release)</label>
+                <input 
+                  type="date" 
+                  value={formData.scheduledDate} 
+                  onChange={(e) => setFormData({...formData, scheduledDate: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Release Time</label>
+                <input 
+                  type="time" 
+                  value={formData.scheduledTime} 
+                  onChange={(e) => setFormData({...formData, scheduledTime: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Changelog items (One change per line)</label>
+              <textarea 
+                value={formData.changelogRaw} 
+                onChange={(e) => setFormData({...formData, changelogRaw: e.target.value})} 
+                placeholder="- Added sandboxed JS compilation engine&#10;- Integrated custom Gemini debugging chatbot&#10;- Restructured global dashboard menu"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary/50 h-32 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Target Hubs (Select none for ALL hubs)</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-900/60 p-4 border border-zinc-850 rounded-xl">
+                {hubs.map((hub) => (
+                  <label key={hub.id} className="flex items-center gap-2.5 cursor-pointer select-none text-xs text-white">
+                    <input 
+                      type="checkbox" 
+                      checked={formData.targetHubs.includes(hub.id)} 
+                      onChange={() => handleToggleHub(hub.id)}
+                      className="rounded border-zinc-700 bg-zinc-800 text-primary focus:ring-primary focus:ring-offset-zinc-900"
+                    />
+                    <span>{hub.name} ({hub.id})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit" className="w-full bg-primary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-primary/20">
+              Deploy Schedule
+            </button>
+          </form>
+        </SectionCard>
+      ) : (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="py-16 text-center text-zinc-500 font-bold text-xs">Loading rollouts...</div>
+          ) : rollouts.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl py-16 text-center text-zinc-500 font-bold text-xs">No rollouts scheduled yet. Click "Schedule Rollout" to deploy updates.</div>
+          ) : (
+            <div className="space-y-4">
+              {rollouts.map((r) => {
+                const isAllHubs = !r.targetHubs || r.targetHubs.length === 0;
+                
+                return (
+                  <SectionCard key={r.id} className="border border-zinc-800 bg-zinc-950/40 backdrop-blur-md">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-zinc-900 pb-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <code className="text-sm font-black text-primary font-mono">{r.version}</code>
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                            r.channel === 'stable' 
+                              ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                              : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                          }`}>
+                            {r.channel}
+                          </span>
+                          
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                            r.status === 'applied' 
+                              ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                              : r.status === 'scheduled'
+                              ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                              : r.status === 'rolled-back'
+                              ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                              : 'text-zinc-400 bg-zinc-800 border-zinc-700'
+                          }`}>
+                            {r.status}
+                          </span>
+                        </div>
+                        
+                        <h3 className="text-base font-black font-headline text-white mt-1.5">{r.title}</h3>
+                        <p className="text-zinc-500 text-xs mt-1">{r.description}</p>
+                      </div>
+
+                      <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
+                        <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left md:text-right space-y-0.5">
+                          <p>Scheduled: {r.scheduledAt ? new Date(r.scheduledAt).toLocaleString() : 'N/A'}</p>
+                          {r.appliedAt && <p className="text-emerald-400">Applied: {new Date(r.appliedAt).toLocaleString()}</p>}
+                          <p className="text-zinc-600">Created: {new Date(r.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        
+                        <div className="flex gap-2 mt-1">
+                          {r.status !== 'applied' && r.status !== 'rolled-back' && (
+                            <button 
+                              onClick={() => handleUpdateStatus(r.id, 'applied')}
+                              className="text-[9px] font-black text-emerald-400 hover:text-white bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500 px-2.5 py-1.5 rounded-lg uppercase tracking-wider transition-colors"
+                            >
+                              Apply Now
+                            </button>
+                          )}
+                          {r.status === 'applied' && (
+                            <button 
+                              onClick={() => handleUpdateStatus(r.id, 'rolled-back')}
+                              className="text-[9px] font-black text-rose-400 hover:text-white bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500 px-2.5 py-1.5 rounded-lg uppercase tracking-wider transition-colors"
+                            >
+                              Rollback
+                            </button>
+                          )}
+                          {r.status === 'scheduled' && (
+                            <button 
+                              onClick={() => handleUpdateStatus(r.id, 'pending')}
+                              className="text-[9px] font-black text-zinc-500 hover:text-white bg-zinc-800 border border-zinc-700 px-2.5 py-1.5 rounded-lg uppercase tracking-wider transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1.5">Changelog Details</p>
+                        {r.changelog && r.changelog.length > 0 ? (
+                          <ul className="list-disc pl-4 space-y-1 text-zinc-400 text-xs">
+                            {r.changelog.map((item, idx) => (
+                              <li key={idx}>{item}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-zinc-655 italic">No changelog specified.</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1.5">Target Scope</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {isAllHubs ? (
+                            <span className="text-[9px] font-black text-zinc-400 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-full uppercase tracking-wider">All Hubs (Global)</span>
+                          ) : (
+                            r.targetHubs.map(hubId => (
+                              <span key={hubId} className="text-[9px] font-black text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                {hubId}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </SectionCard>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Bug Tracker View ────────────────────────────────────── */
+const BugTrackerView = () => {
+  const [bugs, setBugs] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [severityFilter, setSeverityFilter] = React.useState('ALL');
+  const [statusFilter, setStatusFilter] = React.useState('ALL');
+
+  const fetchBugs = async () => {
+    setLoading(true);
+    try {
+      const res = await DB.getBugs();
+      if (res && !res.error) {
+        setBugs(res);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchBugs();
+  }, []);
+
+  const handleUpdateStatus = async (bugId, newStatus) => {
+    try {
+      const res = await DB.updateBugStatus(bugId, newStatus);
+      if (res && !res.error) {
+        addNotification({
+          title: 'Bug Status Updated',
+          body: `Bug status updated to ${newStatus}.`,
+          type: 'success'
+        });
+        fetchBugs();
+      } else {
+        addNotification({
+          title: 'Update Failed',
+          body: res?.error || 'Failed to update bug status.',
+          type: 'error'
+        });
+      }
+    } catch (err) {
+      addNotification({
+        title: 'Error',
+        body: err.message,
+        type: 'error'
+      });
+    }
+  };
+
+  const filteredBugs = bugs.filter(b => {
+    const matchesSev = severityFilter === 'ALL' || b.severity === severityFilter.toLowerCase();
+    const matchesStat = statusFilter === 'ALL' || b.status === statusFilter.toLowerCase();
+    return matchesSev && matchesStat;
+  });
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white flex items-center gap-2">
+            <Bug className="w-6 h-6 text-rose-500 animate-pulse" /> Global Bug Tracker
+          </h2>
+          <p className="text-zinc-500 text-sm mt-1">Monitor, categorize, and resolve issues reported by teachers, students, and administrators.</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div>
+            <label className="text-[8px] font-black uppercase text-zinc-650 block mb-1">Severity</label>
+            <select 
+              value={severityFilter} 
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-300 cursor-pointer focus:outline-none"
+            >
+              <option value="ALL">All Severities</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[8px] font-black uppercase text-zinc-650 block mb-1">Status</label>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-300 cursor-pointer focus:outline-none"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="OPEN">Open</option>
+              <option value="ACKNOWLEDGED">Acknowledged</option>
+              <option value="IN-PROGRESS">In Progress</option>
+              <option value="RESOLVED">Resolved</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="border-b border-zinc-800 bg-zinc-950/20">
+              <tr>
+                {['Bug ID', 'Reporter', 'Summary & Description', 'Page/Route', 'Severity', 'Status', 'Actions'].map((h) => (
+                  <th key={h} className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-850">
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">Loading reported issues...</td>
+                </tr>
+              ) : filteredBugs.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No bug reports match your filter criteria.</td>
+                </tr>
+              ) : (
+                filteredBugs.map((b) => {
+                  const severityColors = {
+                    low: 'text-zinc-400 bg-zinc-800 border-zinc-700',
+                    medium: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+                    high: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                    critical: 'text-rose-400 bg-rose-500/10 border-rose-500/20 animate-pulse'
+                  };
+                  
+                  const statusColors = {
+                    open: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
+                    acknowledged: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                    'in-progress': 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+                    resolved: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                    closed: 'text-zinc-500 bg-zinc-800 border-zinc-700'
+                  };
+
+                  return (
+                    <tr key={b.id} className="hover:bg-white/[0.01] transition-all">
+                      <td className="px-6 py-4">
+                        <span className="text-[10px] font-mono font-bold text-zinc-500">{b.id}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-white">{b.reporterName || 'Anonymous'}</p>
+                          <p className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">
+                            {b.reporterRole} {b.hubId && `· ${b.hubId}`}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 max-w-sm">
+                        <div className="space-y-1">
+                          <p className="text-xs font-black text-white">{b.title}</p>
+                          <p className="text-[11px] text-zinc-400 leading-relaxed break-words whitespace-pre-wrap">{b.description}</p>
+                          <p className="text-[9px] text-zinc-650 font-bold">Reported on {new Date(b.createdAt).toLocaleString()}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <code className="text-[10px] font-mono text-zinc-400 bg-zinc-950/40 px-2 py-1 border border-zinc-800/80 rounded-md">
+                          {b.page || '/'}
+                        </code>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${severityColors[b.severity] || severityColors.low}`}>
+                          {b.severity}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${statusColors[b.status] || statusColors.open}`}>
+                          {b.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select 
+                          value={b.status} 
+                          onChange={(e) => handleUpdateStatus(b.id, e.target.value)}
+                          className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-white focus:outline-none focus:border-primary/50 cursor-pointer"
+                        >
+                          <option value="open">Open</option>
+                          <option value="acknowledged">Acknowledge</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── Main ────────────────────────────────────────────────── */
 const AdminDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1312,6 +2102,8 @@ const AdminDashboard = () => {
     const fetchStats = async () => {
       const st = await DB.getDashboardStats('admin');
       setStats(st);
+      const schools = await DB.getSchools();
+      setHubs(schools);
     };
     fetchStats();
   }, []);
@@ -1326,6 +2118,8 @@ const AdminDashboard = () => {
     analytics:    <AnalyticsView />,
     'exam-analytics': <ExamAnalytics />,
     system:       <SystemMonitorView stats={stats} />,
+    rollouts:     <RolloutManagerView />,
+    bugs:         <BugTrackerView />,
   };
 
   return (

@@ -1,4 +1,4 @@
-const { getAIResponse } = require('./aiService');
+const { getAIResponse, executeCodeAI } = require('./aiService');
 
 /**
  * AI Manager
@@ -77,6 +77,37 @@ class AIManager {
         } catch (err) {
             throw lastError || err;
         }
+    }
+
+    /**
+     * Executes a code execution request using the best available slot
+     */
+    async getBalancedCodeExecution(code, language, action) {
+        const now = Date.now();
+        const availableSlots = this.slots.filter(slot => {
+            slot.usage = slot.usage.filter(timestamp => (now - timestamp) < this.COOLDOWN_MS);
+            return slot.usage.length < slot.limit;
+        });
+
+        if (availableSlots.length === 0) {
+            console.warn("[AI MANAGER] All API slots exhausted. Capacity reached (25 req/min) for code execution.");
+            // Return fallback immediately
+            return await executeCodeAI(code, language, action, null, true);
+        }
+
+        let lastError = null;
+        for (let slot of availableSlots) {
+            slot.usage.push(now);
+            try {
+                return await executeCodeAI(code, language, action, slot.key);
+            } catch (err) {
+                console.error(`[AI MANAGER] Code Exec Error in Slot ${slot.id}:`, err.message);
+                lastError = err;
+            }
+        }
+
+        console.warn("[AI MANAGER] All code execution slots failed. Triggering local mock fallback.");
+        return await executeCodeAI(code, language, action, this.slots[0].key, true);
     }
 }
 

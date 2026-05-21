@@ -11,6 +11,8 @@ const Token = require('./models/Token');
 const Progress = require('./models/Progress');
 const Certificate = require('./models/Certificate');
 const aiManager = require('./services/aiManager');
+const Rollout = require('./models/Rollout');
+const Bug = require('./models/Bug');
 
 const app = express();
 app.use(cors());
@@ -104,6 +106,38 @@ async function seedDatabase() {
             await Token.findOneAndUpdate({ code: t.code }, t, { upsert: true });
         }
 
+        // Seed Rollouts (Updates)
+        const rollouts = [
+            {
+                id: 'RL-SAMPLE-00',
+                version: 'v2.4.0',
+                title: 'v2.4.0 Performance Improvement',
+                description: 'Initial release of the 36-week roadmap, telemetry checks, and attendance modules.',
+                channel: 'stable',
+                targetHubs: [],
+                status: 'applied',
+                scheduledAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+                appliedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+                createdBy: 'Super Admin',
+                changelog: ['Added 36-week learning roadmap', 'Integrated attendance geofencing', 'Added teacher panels']
+            },
+            {
+                id: 'RL-SAMPLE-01',
+                version: 'v2.5.0',
+                title: 'v2.5.0 Stability & Coding Playground',
+                description: 'This update rolls out the interactive Coding Playground and security hardening for user management.',
+                channel: 'stable',
+                targetHubs: [],
+                status: 'scheduled',
+                scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                createdBy: 'Super Admin',
+                changelog: ['Added interactive student coding playground', 'Secured user query endpoints', 'Fixed CSV export functionality']
+            }
+        ];
+        for (const r of rollouts) {
+            await Rollout.findOneAndUpdate({ id: r.id }, r, { upsert: true });
+        }
+
         console.log("Database synced successfully.");
     } catch (err) {
         console.error("Error syncing database:", err);
@@ -181,11 +215,14 @@ app.post('/api/auth/register', async (req, res) => {
 app.get('/api/users', protect, async (req, res) => {
     try {
         const { schoolId } = req.query;
-        // Teachers/SchoolAdmins can only see their school's users
-        if (req.user.role !== 'admin' && schoolId && schoolId !== req.user.schoolId) {
-            return res.status(403).json({ error: 'Unauthorized access to this school' });
+        let filter = {};
+        if (req.user.role !== 'admin') {
+            // Non-admins are strictly locked to their own school's user list
+            filter.schoolId = req.user.schoolId;
+        } else {
+            // Admins can search within a school or fetch all
+            if (schoolId) filter.schoolId = schoolId;
         }
-        const filter = schoolId ? { schoolId } : {};
         const users = await User.find(filter).select('-password');
         res.json(users);
     } catch (err) {
@@ -198,6 +235,12 @@ app.get('/api/users/by-email/:email', protect, async (req, res) => {
     try {
         const user = await User.findOne({ email: decodeURIComponent(req.params.email) }).select('-password');
         if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        // Data boundary validation
+        if (req.user.role !== 'admin' && user.schoolId !== req.user.schoolId) {
+            return res.status(403).json({ error: 'Unauthorized to view this user' });
+        }
+        
         res.json(user);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -212,9 +255,13 @@ app.post('/api/users', protect, authorize('admin', 'school-admin'), async (req, 
             return res.status(400).json({ error: 'A user with this email already exists' });
         }
         
-        // School-admin can only create users in their own school
-        if (req.user.role === 'school-admin' && schoolId !== req.user.schoolId) {
-            return res.status(403).json({ error: 'Not authorized to create users for another school' });
+        let targetSchoolId = schoolId;
+        // School-admin security checks
+        if (req.user.role === 'school-admin') {
+            targetSchoolId = req.user.schoolId;
+            if (role === 'admin') {
+                return res.status(403).json({ error: 'School administrators cannot create super admin users' });
+            }
         }
         
         const id = `u${Date.now()}`;
@@ -224,7 +271,7 @@ app.post('/api/users', protect, authorize('admin', 'school-admin'), async (req, 
             email,
             password: password || 'password123',
             role,
-            schoolId: schoolId || null,
+            schoolId: targetSchoolId || null,
             grade: role === 'student' ? (grade || 6) : null,
             status: status || 'active'
         });
@@ -249,16 +296,31 @@ app.put('/api/users/:id', protect, async (req, res) => {
                 if (user.schoolId !== req.user.schoolId || (schoolId && schoolId !== req.user.schoolId)) {
                     return res.status(403).json({ error: 'Not authorized to modify this user' });
                 }
+                if (role && role !== user.role) {
+                    return res.status(403).json({ error: 'School administrators cannot change user roles' });
+                }
             } else {
                 // Regular user can only modify self
                 if (user.id !== req.user.id) {
                     return res.status(403).json({ error: 'Not authorized to modify this user' });
                 }
+                if (role && role !== user.role) {
+                    return res.status(403).json({ error: 'You cannot change your own role' });
+                }
+                if (schoolId !== undefined && schoolId !== user.schoolId) {
+                    return res.status(403).json({ error: 'You cannot change your school' });
+                }
             }
         }
         
         if (name) user.name = name;
-        if (email) user.email = email;
+        if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+            const emailExists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+            if (emailExists) {
+                return res.status(400).json({ error: 'A user with this email already exists' });
+            }
+            user.email = email;
+        }
         if (role && req.user.role === 'admin') user.role = role; // only superadmin can change roles
         if (schoolId !== undefined && (req.user.role === 'admin' || req.user.role === 'school-admin')) user.schoolId = schoolId;
         if (grade !== undefined) user.grade = grade;
@@ -540,10 +602,202 @@ app.put('/api/users/profile', protect, async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found' });
         
         if (name) user.name = name;
-        if (email) user.email = email;
+        if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+            const exists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+            if (exists) {
+                return res.status(400).json({ error: 'A user with this email already exists' });
+            }
+            user.email = email;
+        }
         
         await user.save();
         res.json({ name: user.name, email: user.email });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── CODE PLAYGROUND ENDPOINT ─────────────────────────────────────────────
+app.post('/api/ai/execute-code', protect, async (req, res) => {
+    try {
+        const { code, language, action } = req.body;
+        if (!code || !language || !action) {
+            return res.status(400).json({ error: 'Missing required parameters: code, language, action' });
+        }
+        const result = await aiManager.getBalancedCodeExecution(code, language, action);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── ROLLOUT ENDPOINTS ────────────────────────────────────────────────────
+app.get('/api/rollouts', protect, async (req, res) => {
+    try {
+        if (req.user.role === 'admin') {
+            const rollouts = await Rollout.find().sort({ createdAt: -1 });
+            return res.json(rollouts);
+        } else if (req.user.role === 'school-admin') {
+            // Find rollouts that apply to their hub (empty list means all hubs)
+            const rollouts = await Rollout.find({
+                $or: [
+                    { targetHubs: { $exists: true, $size: 0 } },
+                    { targetHubs: req.user.schoolId }
+                ]
+            }).sort({ createdAt: -1 });
+            return res.json(rollouts);
+        } else {
+            return res.status(403).json({ error: 'Unauthorized to view rollouts' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/rollouts', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { version, title, description, channel, targetHubs, scheduledAt, changelog } = req.body;
+        
+        // Auto-calculate scheduled time for next midnight if not provided
+        let targetSchedule = scheduledAt;
+        if (!targetSchedule) {
+            const midnight = new Date();
+            midnight.setDate(midnight.getDate() + 1);
+            midnight.setHours(0, 0, 0, 0);
+            targetSchedule = midnight;
+        }
+
+        const rollout = await Rollout.create({
+            id: `RL-${Date.now()}`,
+            version,
+            title,
+            description,
+            channel: channel || 'stable',
+            targetHubs: targetHubs || [],
+            status: 'scheduled',
+            scheduledAt: targetSchedule,
+            createdBy: req.user.name,
+            changelog: changelog || []
+        });
+
+        res.status(201).json(rollout);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/rollouts/:id/status', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { status } = req.body;
+        const rollout = await Rollout.findOne({ id: req.params.id });
+        if (!rollout) return res.status(404).json({ error: 'Rollout not found' });
+        
+        rollout.status = status;
+        if (status === 'applied') {
+            rollout.appliedAt = new Date();
+        }
+        await rollout.save();
+        res.json(rollout);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/rollouts/pending', protect, async (req, res) => {
+    try {
+        const schoolId = req.user.schoolId;
+        if (!schoolId) return res.json({ pending: false });
+        
+        // Check for any scheduled rollout targeting this school
+        const scheduled = await Rollout.findOne({
+            status: 'scheduled',
+            $or: [
+                { targetHubs: { $exists: true, $size: 0 } },
+                { targetHubs: schoolId }
+            ]
+        });
+        
+        if (scheduled) {
+            return res.json({ pending: true, rollout: scheduled });
+        }
+        res.json({ pending: false });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Auto-apply scheduled rollouts when their time passes
+setInterval(async () => {
+    try {
+        const now = new Date();
+        const pendingApplications = await Rollout.find({
+            status: 'scheduled',
+            scheduledAt: { $lte: now }
+        });
+        for (const r of pendingApplications) {
+            r.status = 'applied';
+            r.appliedAt = now;
+            await r.save();
+            console.log(`[ROLLOUT AUTO-APPLY] Applied scheduled rollout ${r.version} (${r.title})`);
+        }
+    } catch (err) {
+        console.error('[ROLLOUT AUTO-APPLY ERROR]:', err);
+    }
+}, 30000);
+
+// ── BUG REPORT ENDPOINTS ─────────────────────────────────────────────────
+app.post('/api/bugs', protect, async (req, res) => {
+    try {
+        const { title, description, severity, category, page } = req.body;
+        if (!title || !description) {
+            return res.status(400).json({ error: 'Title and description are required' });
+        }
+        
+        const bug = await Bug.create({
+            id: `BUG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            title,
+            description,
+            severity: severity || 'medium',
+            category: category || 'Other',
+            page: page || '',
+            reportedBy: req.user.id,
+            reporterRole: req.user.role,
+            reporterName: req.user.name,
+            hubId: req.user.schoolId || null
+        });
+
+        res.status(201).json(bug);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/bugs', protect, async (req, res) => {
+    try {
+        if (req.user.role === 'admin') {
+            const bugs = await Bug.find().sort({ createdAt: -1 });
+            return res.json(bugs);
+        } else if (req.user.role === 'school-admin') {
+            const bugs = await Bug.find({ hubId: req.user.schoolId }).sort({ createdAt: -1 });
+            return res.json(bugs);
+        } else {
+            const bugs = await Bug.find({ reportedBy: req.user.id }).sort({ createdAt: -1 });
+            return res.json(bugs);
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/bugs/:id/status', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { status } = req.body;
+        const bug = await Bug.findOne({ id: req.params.id });
+        if (!bug) return res.status(404).json({ error: 'Bug not found' });
+        
+        bug.status = status;
+        await bug.save();
+        res.json(bug);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin, Clock, ThumbsUp, ThumbsDown, Inbox, ClipboardList } from 'lucide-react';
+import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin, Clock, ThumbsUp, ThumbsDown, Inbox, ClipboardList, Rocket, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import { getHubData } from '../lib/mapping';
@@ -236,12 +236,216 @@ const OverviewView = ({ schoolData, stats }) => {
         </div>
       </SectionCard>
 
+      {/* Hub Subscription & Feature Quotas Card */}
+      <SectionCard
+        title="Hub Subscription & Feature Quotas"
+        subtitle="Platform resource limits and feature access configuration assigned to your hub."
+        delay={0.32}
+        className="mb-4"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Subscription Plan</p>
+            <h4 className="text-lg font-black text-emerald-400 mt-1">{schoolData.school?.plan || 'Basic'} Plan</h4>
+            <p className="text-[10px] text-zinc-650 mt-1">Core account tier assigned by super admin</p>
+          </div>
+
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">AI Request Limit</p>
+            <h4 className="text-lg font-black text-white mt-1">{(schoolData.school?.aiLimit || 20000).toLocaleString()}/mo</h4>
+            <p className="text-[10px] text-zinc-650 mt-1">Monthly total queries allowance</p>
+          </div>
+
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Exams Quota</p>
+            <h4 className="text-lg font-black text-white mt-1">{(schoolData.school?.featureLimits?.examLimit || 50).toLocaleString()}/mo</h4>
+            <p className="text-[10px] text-zinc-650 mt-1">Maximum examinations created monthly</p>
+          </div>
+
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Storage Capacity</p>
+            <h4 className="text-lg font-black text-white mt-1">{(schoolData.school?.featureLimits?.storageLimit || 10).toLocaleString()} GB</h4>
+            <p className="text-[10px] text-zinc-650 mt-1">Syllabus & media uploads ceiling</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Coding Playground</p>
+              <p className="text-xs font-bold text-white mt-0.5">Student IDE Access</p>
+            </div>
+            <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+              schoolData.school?.featureLimits?.playgroundEnabled !== false
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                : 'text-zinc-500 bg-zinc-800/40 border-zinc-850'
+            }`}>
+              {schoolData.school?.featureLimits?.playgroundEnabled !== false ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Community Access</p>
+              <p className="text-xs font-bold text-white mt-0.5">Collaboration portal</p>
+            </div>
+            <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+              schoolData.school?.featureLimits?.communityAccess !== false
+                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                : 'text-zinc-500 bg-zinc-800/40 border-zinc-850'
+            }`}>
+              {schoolData.school?.featureLimits?.communityAccess !== false ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Certificate Generation</p>
+              <p className="text-xs font-bold text-white mt-0.5">Monthly allocation</p>
+            </div>
+            <span className="text-[10px] font-black text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              {schoolData.school?.featureLimits?.certificateLimit || 200}/mo
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-zinc-900/60 border border-zinc-800/60 rounded-xl text-center">
+          <p className="text-[10px] text-zinc-500 font-medium">
+            ℹ️ Hub features and resource quotas are managed exclusively by the Super Admin. Contact system administrators to adjust these limits.
+          </p>
+        </div>
+      </SectionCard>
+
       <ActivityFeed title="Hub Activity" subtitle="Latest events at your institution" delay={0.35} items={[
         { name: 'Robotics Workshop', action: 'Scheduled — Tomorrow 10:00 AM, Lab A',     time: 'Upcoming',  tag: 'now',    avatar: '🤖', avatarBg: 'bg-primary/20',   avatarColor: 'text-primary' },
         { name: 'AI Ethics Seminar', action: 'Friday, 2:00 PM — Main Hall',             time: 'This week', tag: 'recent', avatar: '💡', avatarBg: 'bg-secondary/20', avatarColor: 'text-secondary' },
         { name: 'Grade 6 Insight',   action: '+12% completion increase this week',       time: '2h ago',    tag: 'recent', avatar: '📈', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
         { name: 'At-Risk Alert',     action: '8 students need immediate attention',      time: '1 day ago', tag: 'warning', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
       ]} />
+    </div>
+  );
+};
+
+/* ── Rollout Log View (School Admin) ─────────────────────── */
+const RolloutLogView = () => {
+  const [rollouts, setRollouts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchRollouts = async () => {
+      setLoading(true);
+      try {
+        const res = await DB.getRollouts();
+        if (res && !res.error) {
+          const schoolId = user?.schoolId;
+          const filtered = res.filter(r => 
+            !r.targetHubs || 
+            r.targetHubs.length === 0 || 
+            r.targetHubs.includes(schoolId)
+          );
+          setRollouts(filtered);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRollouts();
+  }, [user]);
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div>
+        <h2 className="text-2xl font-black font-headline tracking-tighter text-white flex items-center gap-2">
+          <Rocket className="w-6 h-6 text-emerald-400" /> System Update Log
+        </h2>
+        <p className="text-zinc-500 text-sm mt-1">Review the history of feature rollouts, system patches, and scheduled upgrades delivered to your hub.</p>
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="border-b border-zinc-800 bg-zinc-950/20">
+              <tr>
+                {['Version', 'Release Details', 'Channel', 'Date Received', 'Scheduled Update', 'Status'].map((h) => (
+                  <th key={h} className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-850">
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">Loading system update log...</td>
+                </tr>
+              ) : rollouts.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No updates rolled out to your hub yet.</td>
+                </tr>
+              ) : (
+                rollouts.map((r) => {
+                  const statusColors = {
+                    pending: 'text-zinc-400 bg-zinc-800 border-zinc-700',
+                    scheduled: 'text-blue-400 bg-blue-500/10 border-blue-500/20 animate-pulse',
+                    applied: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                    'rolled-back': 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                  };
+
+                  return (
+                    <tr key={r.id} className="hover:bg-white/[0.01] transition-all">
+                      <td className="px-6 py-4">
+                        <code className="text-sm font-black font-mono text-emerald-400">{r.version}</code>
+                      </td>
+                      <td className="px-6 py-4 max-w-sm">
+                        <div className="space-y-1">
+                          <p className="text-xs font-black text-white">{r.title}</p>
+                          {r.description && <p className="text-[11px] text-zinc-400 leading-relaxed">{r.description}</p>}
+                          {r.changelog && r.changelog.length > 0 && (
+                            <ul className="list-disc pl-4 mt-1.5 space-y-0.5 text-[10px] text-zinc-500">
+                              {r.changelog.map((item, idx) => (
+                                <li key={idx}>{item}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded border ${
+                          r.channel === 'stable' 
+                            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                            : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                        }`}>
+                          {r.channel}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-[10px] font-mono text-zinc-500">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-[10px] font-mono text-zinc-400">
+                          {r.status === 'applied' && r.appliedAt ? (
+                            <span className="text-emerald-400 font-bold">Applied: {new Date(r.appliedAt).toLocaleString()}</span>
+                          ) : r.scheduledAt ? (
+                            <span>Scheduled: {new Date(r.scheduledAt).toLocaleString()}</span>
+                          ) : (
+                            <span className="text-zinc-650">Pending Schedule</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${statusColors[r.status] || statusColors.pending}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1156,7 +1360,13 @@ const SchoolAdminDashboard = () => {
         const sCount   = users.filter(u => u.role === 'student').length;
         const tCount   = users.filter(u => u.role === 'teacher').length;
         const quota    = mySchool.studentLimit ? Math.min((sCount / mySchool.studentLimit) * 100, 100).toFixed(1) : '0';
-        setSchoolData({ name: mySchool.name || hubInfo.name, studentCount: sCount || hubInfo.stats.totalStudents, teacherCount: tCount || 1, quotaUsed: `${quota}%` });
+        setSchoolData({ 
+          name: mySchool.name || hubInfo.name, 
+          studentCount: sCount || hubInfo.stats.totalStudents, 
+          teacherCount: tCount || 1, 
+          quotaUsed: `${quota}%`,
+          school: mySchool
+        });
         
         const st = await DB.getDashboardStats('school-admin', schoolId);
         setStats(st);
@@ -1174,7 +1384,8 @@ const SchoolAdminDashboard = () => {
     'exam-analytics': <ExamAnalytics />,
     attendance:   <SchoolAttendanceView />,
     pending:      <HubPendingView />,
-    certificates: <CertificatesView /> 
+    certificates: <CertificatesView />,
+    'rollout-log': <RolloutLogView />
   };
   return (
     <AnimatePresence mode="wait">

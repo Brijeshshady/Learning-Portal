@@ -16,6 +16,7 @@ import CertificateTemplate from '../components/CertificateTemplate';
 import Exams from './Exams';
 import ExamAttempt from './ExamAttempt';
 import Results from './Results';
+import CodingPlayground from './CodingPlayground';
 
 /* ── Overview ─────────────────────────────────────────────── */
 const OverviewView = ({ user, setView, certificates = [], stats }) => {
@@ -1080,6 +1081,7 @@ const StudentDashboard = () => {
     'exam-attempt': <ExamAttempt user={user} />,
     'exam-results': <Results />,
     'ai-lab': <AILabView />,
+    playground: <CodingPlayground />,
     projects: <ProjectsView user={user} />,
     roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} stats={stats} />,
     attendance: <MyAttendanceView user={user} />,

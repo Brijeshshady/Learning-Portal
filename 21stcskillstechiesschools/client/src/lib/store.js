@@ -264,37 +264,60 @@ export const addUser = async (user) => {
 };
 
 export const updateUser = async (id, patch) => {
+  const originalUser = state.users.find((u) => u.id === id);
+  if (!originalUser) return;
+
   // Optimistic local update
   state = { ...state, users: state.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) };
   notify();
+
   // Sync to backend
   try {
     const token = _getToken();
-    await fetch(`/api/users/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify(patch)
     });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Server responded with status ${res.status}`);
+    }
   } catch (err) {
-    console.warn('[store] updateUser backend failed', err);
+    console.warn('[store] updateUser backend failed, reverting changes', err);
+    // Revert optimistic update
+    state = { ...state, users: state.users.map((u) => (u.id === id ? originalUser : u)) };
+    notify();
+    throw err;
   }
 };
 
 export const removeUser = async (id) => {
   const user = state.users.find((u) => u.id === id);
+  if (!user) return;
+
   // Optimistic local removal
   state = { ...state, users: state.users.filter((u) => u.id !== id) };
-  if (user) addNotification({ title: 'User Removed', body: `${user.name} was removed.`, type: 'warning' });
   notify();
+
   // Sync to backend
   try {
     const token = _getToken();
-    await fetch(`/api/users/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
     });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `Server responded with status ${res.status}`);
+    }
+    addNotification({ title: 'User Removed', body: `${user.name} was removed.`, type: 'warning' });
   } catch (err) {
-    console.warn('[store] removeUser backend failed', err);
+    console.warn('[store] removeUser backend failed, reverting changes', err);
+    // Revert optimistic removal by restoring the user
+    state = { ...state, users: [user, ...state.users] };
+    notify();
+    throw err;
   }
 };
 
@@ -396,6 +419,11 @@ export const addHub = (hub) => {
 
 export const updateHub = (id, patch) => {
   state = { ...state, hubs: state.hubs.map((h) => (h.id === id ? { ...h, ...patch } : h)) };
+  notify();
+};
+
+export const setHubs = (hubs) => {
+  state = { ...state, hubs };
   notify();
 };
 
