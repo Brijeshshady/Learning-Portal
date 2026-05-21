@@ -10,6 +10,8 @@ import { addUser, removeUser, updateUser, exportCSV, addNotification, markAttend
 import Modal from '../components/Modal';
 import html2pdf from 'html2pdf.js';
 import CertificateTemplate from '../components/CertificateTemplate';
+import ExamAnalytics from './ExamAnalytics';
+
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
   AreaChartCard, BarChartCard, ActivityFeed, SectionCard,
@@ -25,43 +27,224 @@ const HEAT = {
 
 
 /* ── Overview ─────────────────────────────────────────────── */
-const OverviewView = ({ schoolData, stats }) => (
-  <div>
-    <PageHeader title={schoolData.name} subtitle="Institutional overview — here's your hub's current performance." />
-    <KpiGrid>
-      <KpiCard label="Total Students"  value={schoolData.studentCount} change={stats?.kpis?.studentsChange || "0"}   changeLabel="this term"    icon={Users}    iconBg="bg-primary/15"    iconColor="text-primary"     delay={0.05} />
-      <KpiCard label="Teachers"        value={schoolData.teacherCount} change={stats?.kpis?.teachersChange || "0"}    changeLabel="new hire"      icon={UserCog}  iconBg="bg-blue-500/15"   iconColor="text-blue-400"    delay={0.1}  />
-      <KpiCard label="Quota Used"      value={schoolData.quotaUsed}    change="+4.2%" changeLabel="of seat limit"  icon={Activity} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" delay={0.15} />
-      <KpiCard label="Active Grades"   value="6 – 9"                   change="4"     changeLabel="grade levels"   icon={BarChart3} iconBg="bg-secondary/15"  iconColor="text-secondary"  delay={0.2}  />
-    </KpiGrid>
-    <ChartRow>
-      <AreaChartCard title="Weekly Active Users" subtitle="Hub attendance across all grades" data={stats?.hubTrendData || []} dataKey="active" color="#10b981" delay={0.2} />
-      <BarChartCard  title="Grade Distribution"  subtitle="Total student enrollment by grade" data={stats?.gradeDistData || []}  dataKey="val" color="#3b82f6" delay={0.25} />
-    </ChartRow>
+const OverviewView = ({ schoolData, stats }) => {
+  const [calibrating, setCalibrating] = useState(false);
+  const [rebooting, setRebooting] = useState(false);
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [isRebooted, setIsRebooted] = useState(false);
 
-    {/* Heatmap */}
-    <SectionCard title="Grade Performance Heatmap" subtitle="This term's completion scores by grade" delay={0.3} className="mb-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
-        {[{ grade: '6', score: '88%', status: 'Excellent', heat: 'emerald' }, { grade: '7', score: '72%', status: 'Good', heat: 'blue' }, { grade: '8', score: '54%', status: 'Moderate', heat: 'amber' }, { grade: '9', score: 'N/A', status: 'Pending', heat: 'zinc' }].map((g) => (
-          <div key={g.grade} className="text-center space-y-2">
-            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Grade {g.grade}</p>
-            <div className={`h-28 ${HEAT[g.heat].card} border rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:scale-[1.02] transition-all`}>
-              <span className={`text-2xl font-black font-headline ${HEAT[g.heat].text}`}>{g.score}</span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">{g.status}</span>
+  // Fallback hub metrics if not present
+  const metrics = stats?.hubLoadMetrics || {
+    aiQuotaUsed: 14245,
+    aiQuotaLimit: 20000,
+    activeClients: 342,
+    maxClients: 500,
+    routerCpu: 42,
+    routerMem: 58,
+    iotStatus: { online: 58, total: 60 }
+  };
+
+  const aiPercentage = Math.round((metrics.aiQuotaUsed / metrics.aiQuotaLimit) * 100);
+  const clientPercentage = Math.round((metrics.activeClients / metrics.maxClients) * 100);
+
+  const handleCalibrate = () => {
+    setCalibrating(true);
+    setIsCalibrated(false);
+    setTimeout(() => {
+      setCalibrating(false);
+      setIsCalibrated(true);
+      addNotification({
+        title: 'Diagnostics Complete',
+        body: 'GPS Proximity Server calibrated successfully.',
+        type: 'success'
+      });
+    }, 2500);
+  };
+
+  const handleReboot = () => {
+    setRebooting(true);
+    setIsRebooted(false);
+    setTimeout(() => {
+      setRebooting(false);
+      setIsRebooted(true);
+      addNotification({
+        title: 'Router Rebooted',
+        body: 'Lab Router rebooted and all 58/60 IoT kits reconnected successfully.',
+        type: 'success'
+      });
+    }, 3000);
+  };
+
+  return (
+    <div>
+      <PageHeader title={schoolData.name} subtitle="Institutional overview — here's your hub's current performance." />
+      <KpiGrid>
+        <KpiCard label="Total Students"  value={schoolData.studentCount} change={stats?.kpis?.studentsChange || "0"}   changeLabel="this term"    icon={Users}    iconBg="bg-primary/15"    iconColor="text-primary"     delay={0.05} />
+        <KpiCard label="Teachers"        value={schoolData.teacherCount} change={stats?.kpis?.teachersChange || "0"}    changeLabel="new hire"      icon={UserCog}  iconBg="bg-blue-500/15"   iconColor="text-blue-400"    delay={0.1}  />
+        <KpiCard label="Quota Used"      value={schoolData.quotaUsed}    change="+4.2%" changeLabel="of seat limit"  icon={Activity} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" delay={0.15} />
+        <KpiCard label="Active Grades"   value="6 – 9"                   change="4"     changeLabel="grade levels"   icon={BarChart3} iconBg="bg-secondary/15"  iconColor="text-secondary"  delay={0.2}  />
+      </KpiGrid>
+      
+      <ChartRow>
+        <AreaChartCard title="Weekly Active Users" subtitle="Hub attendance across all grades" data={stats?.hubTrendData || []} dataKey="active" color="#10b981" delay={0.2} />
+        <BarChartCard  title="Grade Distribution"  subtitle="Total student enrollment by grade" data={stats?.gradeDistData || []}  dataKey="val" color="#3b82f6" delay={0.25} />
+      </ChartRow>
+
+      {/* Local Hub Server & Gateway Health Card */}
+      <SectionCard
+        title="Local Hub Server & Gateway Health"
+        subtitle="Real-time monitoring of school AI quotas, edge gateway nodes, and lab connections."
+        delay={0.28}
+        className="mb-4"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+          {/* AI Usage Quota Progress Bar */}
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">AI Request Quota</p>
+                <h4 className="text-sm font-bold text-white mt-1">Monthly Allocation</h4>
+              </div>
+              <span className={`text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${
+                aiPercentage > 85 ? 'text-red-400 bg-red-500/10 border-red-500/20' :
+                aiPercentage > 70 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+              }`}>
+                {aiPercentage}% Used
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="font-medium text-zinc-400">{metrics.aiQuotaUsed.toLocaleString()} queries</span>
+                <span className="font-bold text-zinc-500">/ {metrics.aiQuotaLimit.toLocaleString()} limit</span>
+              </div>
+              <div className="h-2.5 bg-zinc-900 border border-zinc-800 rounded-full overflow-hidden relative">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    aiPercentage > 85 ? 'bg-red-500' :
+                    aiPercentage > 70 ? 'bg-amber-500' :
+                    'bg-emerald-500'
+                  }`}
+                  style={{ width: `${aiPercentage}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                {aiPercentage > 85 ? 'Warning: Quota limit nearly exceeded. Contact administrator to scale keys.' :
+                 aiPercentage > 70 ? 'Alert: Approaching quota warning threshold.' :
+                 'System operating normally within standard allocation limits.'}
+              </p>
             </div>
           </div>
-        ))}
-      </div>
-    </SectionCard>
 
-    <ActivityFeed title="Hub Activity" subtitle="Latest events at your institution" delay={0.35} items={[
-      { name: 'Robotics Workshop', action: 'Scheduled — Tomorrow 10:00 AM, Lab A',     time: 'Upcoming',  tag: 'now',    avatar: '🤖', avatarBg: 'bg-primary/20',   avatarColor: 'text-primary' },
-      { name: 'AI Ethics Seminar', action: 'Friday, 2:00 PM — Main Hall',             time: 'This week', tag: 'recent', avatar: '💡', avatarBg: 'bg-secondary/20', avatarColor: 'text-secondary' },
-      { name: 'Grade 6 Insight',   action: '+12% completion increase this week',       time: '2h ago',    tag: 'recent', avatar: '📈', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
-      { name: 'At-Risk Alert',     action: '8 students need immediate attention',      time: '1 day ago', tag: 'warning', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
-    ]} />
-  </div>
-);
+          {/* IoT Gateway Status */}
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">IoT Lab Gateway</p>
+              <h4 className="text-sm font-bold text-white mt-1">Hardware Kits Connectivity</h4>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Active Kits</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-xl font-black text-emerald-400">{metrics.iotStatus.online}</span>
+                  <span className="text-xs text-zinc-600">/ {metrics.iotStatus.total}</span>
+                </div>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Connected Clients</span>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-xl font-black text-white">{metrics.activeClients}</span>
+                  <span className="text-xs text-zinc-600">/ {metrics.maxClients}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Router status stats */}
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-zinc-500 pt-1">
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> CPU: {metrics.routerCpu}%</span>
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> MEM: {metrics.routerMem}%</span>
+              <span className="text-emerald-400">Online</span>
+            </div>
+          </div>
+
+          {/* Diagnostic Controls */}
+          <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">System Diagnostics</p>
+              <h4 className="text-sm font-bold text-white mt-1">Local Control Actions</h4>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={handleCalibrate}
+                disabled={calibrating}
+                className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-700 disabled:opacity-50 transition-all group text-left"
+              >
+                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-white transition-colors">
+                  GPS Proximity Calibrate
+                </span>
+                {calibrating ? (
+                  <svg className="animate-spin h-3.5 w-3.5 text-primary shrink-0" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : isCalibrated ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 animate-bounce shrink-0" />
+                ) : (
+                  <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-white transition-all transform group-hover:translate-x-1 shrink-0" />
+                )}
+              </button>
+
+              <button
+                onClick={handleReboot}
+                disabled={rebooting}
+                className="w-full flex items-center justify-between px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-zinc-700 disabled:opacity-50 transition-all group text-left"
+              >
+                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 group-hover:text-white transition-colors">
+                  Reboot Lab Router
+                </span>
+                {rebooting ? (
+                  <svg className="animate-spin h-3.5 w-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : isRebooted ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 animate-bounce shrink-0" />
+                ) : (
+                  <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-white transition-all transform group-hover:translate-x-1 shrink-0" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Heatmap */}
+      <SectionCard title="Grade Performance Heatmap" subtitle="This term's completion scores by grade" delay={0.3} className="mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+          {[{ grade: '6', score: '88%', status: 'Excellent', heat: 'emerald' }, { grade: '7', score: '72%', status: 'Good', heat: 'blue' }, { grade: '8', score: '54%', status: 'Moderate', heat: 'amber' }, { grade: '9', score: 'N/A', status: 'Pending', heat: 'zinc' }].map((g) => (
+            <div key={g.grade} className="text-center space-y-2">
+              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Grade {g.grade}</p>
+              <div className={`h-28 ${HEAT[g.heat].card} border rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:scale-[1.02] transition-all`}>
+                <span className={`text-2xl font-black font-headline ${HEAT[g.heat].text}`}>{g.score}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">{g.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <ActivityFeed title="Hub Activity" subtitle="Latest events at your institution" delay={0.35} items={[
+        { name: 'Robotics Workshop', action: 'Scheduled — Tomorrow 10:00 AM, Lab A',     time: 'Upcoming',  tag: 'now',    avatar: '🤖', avatarBg: 'bg-primary/20',   avatarColor: 'text-primary' },
+        { name: 'AI Ethics Seminar', action: 'Friday, 2:00 PM — Main Hall',             time: 'This week', tag: 'recent', avatar: '💡', avatarBg: 'bg-secondary/20', avatarColor: 'text-secondary' },
+        { name: 'Grade 6 Insight',   action: '+12% completion increase this week',       time: '2h ago',    tag: 'recent', avatar: '📈', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
+        { name: 'At-Risk Alert',     action: '8 students need immediate attention',      time: '1 day ago', tag: 'warning', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
+      ]} />
+    </div>
+  );
+};
 
 /* ── Users View ──────────────────────────────────────────── */
 const UsersView = () => {
@@ -143,21 +326,106 @@ const UsersView = () => {
         <div className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search members…" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all" /></div>
         <div className="flex gap-2">{['all', 'student', 'teacher'].map((f) => <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-zinc-800 border border-zinc-700 text-zinc-500 hover:text-white'}`}>{f}</button>)}</div>
       </div>
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="border-b border-zinc-800 bg-zinc-900/60"><tr>{['Member', 'Role', 'Grade', 'Status', 'Actions'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-zinc-800">{filtered.map((u) => (
-            <tr key={u.id} className="hover:bg-white/[0.01] transition-all">
-              <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-black text-xs">{u.name[0]}</div><div><p className="text-sm font-bold text-white">{u.name}</p><p className="text-[10px] text-zinc-500">{u.email}</p></div></div></td>
-              <td className="px-6 py-4"><span className="text-[9px] font-black bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg text-zinc-400 uppercase tracking-widest">{u.role}</span></td>
-              <td className="px-6 py-4 text-xs text-zinc-500 font-bold">{u.grade ? `Grade ${u.grade}` : '—'}</td>
-              <td className="px-6 py-4"><div className="flex items-center gap-1.5">{u.status === 'active' ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[9px] font-black text-emerald-500 uppercase">Active</span></> : <><AlertCircle className="w-3.5 h-3.5 text-zinc-500" /><span className="text-[9px] font-black text-zinc-500 uppercase">Inactive</span></>}</div></td>
-              <td className="px-6 py-4 text-right space-x-2"><button onClick={() => handleOpenEdit(u)} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-600 text-zinc-400 hover:text-white transition-all">Edit</button><button onClick={() => removeUser(u.id)} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition-all">Remove</button></td>
-            </tr>
-          ))}
-          {filtered.length === 0 && <tr><td colSpan="5" className="px-6 py-12 text-center text-zinc-500 text-sm font-bold">No members found.</td></tr>}
-          </tbody>
-        </table>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
+        <div className="p-6 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/40">
+          <span className="text-[9px] font-black bg-zinc-800/60 border border-zinc-700 px-3 py-1.5 rounded-lg text-zinc-400 uppercase tracking-widest">
+            {filtered.length} active records
+          </span>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="px-6 py-16 text-center text-zinc-500 text-sm font-bold">No members found.</div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filtered.map((u) => {
+              // Role-based design tokens
+              let roleConfig = {
+                badge: 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10',
+                avatarBg: 'bg-gradient-to-tr from-emerald-600 to-teal-500',
+                border: 'border-zinc-800/80 hover:border-emerald-500/30 shadow-[0_0_20px_-5px_rgba(16,185,129,0.05)]'
+              };
+              if (u.role === 'teacher') {
+                roleConfig = {
+                  badge: 'border-purple-500/20 text-purple-400 bg-purple-500/10',
+                  avatarBg: 'bg-gradient-to-tr from-purple-600 to-pink-500',
+                  border: 'border-zinc-800/80 hover:border-purple-500/30 shadow-[0_0_20px_-5px_rgba(168,85,247,0.05)]'
+                };
+              }
+
+              return (
+                <motion.div
+                  key={u.id}
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                  className={`bg-zinc-950/40 border ${roleConfig.border} rounded-2xl p-5 flex flex-col justify-between transition-all duration-300`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl ${roleConfig.avatarBg} flex items-center justify-center text-white font-black text-sm shadow-md`}>
+                          {u.name[0]}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-black text-white truncate max-w-[140px]" title={u.name}>{u.name}</h3>
+                          <p className="text-[10px] text-zinc-500 truncate max-w-[140px]" title={u.email}>{u.email}</p>
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-black border px-2.5 py-1 rounded-md uppercase tracking-wider shrink-0 ${roleConfig.badge}`}>
+                        {u.role}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5 pt-3.5 border-t border-zinc-900/60">
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="font-bold text-zinc-500 uppercase tracking-wider">Role Type</span>
+                        <span className="font-bold text-zinc-400 uppercase">{u.role}</span>
+                      </div>
+                      {u.role === 'student' && u.grade && (
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="font-bold text-zinc-500 uppercase tracking-wider">Class Grade</span>
+                          <span className="font-bold text-zinc-400 uppercase">Grade {u.grade}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="font-bold text-zinc-500 uppercase tracking-wider">Status</span>
+                        <div className="flex items-center gap-1.5">
+                          {u.status === 'active' ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="font-black text-emerald-500 uppercase tracking-wider">Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-3.5 h-3.5 text-zinc-600" />
+                              <span className="font-black text-zinc-600 uppercase tracking-wider">Inactive</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-5 pt-3.5 border-t border-zinc-900/60">
+                    <button 
+                      onClick={() => handleOpenEdit(u)} 
+                      className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-700 text-zinc-400 hover:text-white transition-all"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if(confirm(`Remove ${u.name}?`)) removeUser(u.id);
+                      }} 
+                      className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingUser ? "Edit Institution Member" : "Add Institution Member"}>
@@ -878,6 +1146,7 @@ const SchoolAdminDashboard = () => {
     overview:     <OverviewView schoolData={schoolData} stats={stats} />, 
     users:        <UsersView />, 
     analytics:    <AnalyticsView />, 
+    'exam-analytics': <ExamAnalytics />,
     attendance:   <SchoolAttendanceView />,
     pending:      <HubPendingView />,
     certificates: <CertificatesView /> 

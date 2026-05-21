@@ -13,6 +13,9 @@ import { addNotification, applyLeave, submitAssignment, cancelLeave } from '../l
 import useStore from '../hooks/useStore';
 import html2pdf from 'html2pdf.js';
 import CertificateTemplate from '../components/CertificateTemplate';
+import Exams from './Exams';
+import ExamAttempt from './ExamAttempt';
+import Results from './Results';
 
 /* ── Overview ─────────────────────────────────────────────── */
 const OverviewView = ({ user, setView, certificates = [], stats }) => {
@@ -191,7 +194,7 @@ const AILabView = () => {
                 <motion.div key="video" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                   {/* High Fidelity Thumbnail generated via generate_image */}
                   <div className="relative aspect-video bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 group cursor-pointer shadow-2xl">
-                    <img src="/ai_lab_thumbnail_1778365956246.png" alt="Neural Networks Masterclass" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
+                    <img src="/ai_lab_thumbnail_1779341236996.png" alt="Neural Networks Masterclass" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/20 transition-all">
                       <div className="w-20 h-20 bg-secondary/90 text-white rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(139,92,246,0.6)] group-hover:scale-110 group-hover:bg-purple-500 transition-all backdrop-blur-md">
                         <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-2" />
@@ -1064,6 +1067,9 @@ const StudentDashboard = () => {
 
   const views = {
     overview: <OverviewView user={user} setView={(v) => setSearchParams({ v })} certificates={certificates} stats={stats} />,
+    exams: <Exams user={user} setView={(v) => setSearchParams({ v })} />,
+    'exam-attempt': <ExamAttempt user={user} />,
+    'exam-results': <Results />,
     'ai-lab': <AILabView />,
     projects: <ProjectsView user={user} />,
     roadmap:  <RoadmapView setView={(v) => setSearchParams({ v })} />,

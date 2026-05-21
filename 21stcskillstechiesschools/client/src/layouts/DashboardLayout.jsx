@@ -20,6 +20,7 @@ const VIEW_TITLES = {
     activation:'License Management',
     attendance:'System Attendance',
     analytics: 'Platform Analytics',
+    system:    'System Monitor',
   },
   'school-admin': {
     overview:  'Institution Overview',
@@ -58,7 +59,7 @@ const ROLE_BADGE = {
 };
 
 const DashboardLayout = () => {
-  const { user }  = useAuth();
+  const { user, logout }  = useAuth();
   const [searchParams] = useSearchParams();
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);

@@ -40,12 +40,39 @@ const dashboardStats = {
       { name: 'Capacity Warning', action: 'Grade 7 AI Lab reaching limit', time: 'Just now', tag: 'now', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
       { name: 'Hardware Sync', action: '24 IoT kits offline in Wing B', time: '2h ago', tag: 'recent', avatar: '⚡', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' },
       { name: 'New Enrollment', action: '15 new students onboarded', time: 'Yesterday', tag: 'older', avatar: '+', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' }
-    ]
+    ],
+    hubLoadMetrics: {
+      aiQuotaUsed: 14245,
+      aiQuotaLimit: 20000,
+      activeClients: 342,
+      maxClients: 500,
+      routerCpu: 42,
+      routerMem: 58,
+      iotStatus: { online: 58, total: 60 }
+    }
   },
   admin: {
     kpis: { activeHubs: 12, hubsChange: '+2', totalStudents: '45.2K', studentsChange: '+15%', systemUptime: '99.9%', uptimeChange: '+0.1%', mrr: '$124K', mrrChange: '+8%' },
     enrollmentData: [{ name: 'Jan', value: 820 }, { name: 'Feb', value: 932 }, { name: 'Mar', value: 1100 }, { name: 'Apr', value: 1450 }, { name: 'May', value: 1800 }, { name: 'Jun', value: 2400 }, { name: 'Jul', value: 3200 }],
-    performanceData: [{ name: 'Node A', cpu: 45, mem: 60 }, { name: 'Node B', cpu: 75, mem: 82 }, { name: 'Node C', cpu: 30, mem: 45 }, { name: 'DB Sync', cpu: 88, mem: 95 }],
+    performanceData: [
+      { name: 'Node A (Chennai Core)', cpu: 45, mem: 60, connections: 840, latency: 12, disk: 18, status: 'healthy' },
+      { name: 'Node B (Coimbatore Core)', cpu: 75, mem: 82, connections: 1202, latency: 38, disk: 44, status: 'warning' },
+      { name: 'Node C (Regional Router)', cpu: 30, mem: 45, connections: 450, latency: 15, disk: 12, status: 'healthy' },
+      { name: 'DB Sync (Master Node)', cpu: 88, mem: 95, connections: 345, latency: 45, disk: 78, status: 'critical' }
+    ],
+    aiUsageStats: {
+      totalRequests: 84293,
+      totalTokens: 14283921,
+      costSavingsPct: 92,
+      averageLatencyMs: 142,
+      keysStatus: [
+        { slot: 1, key: 'AIzaSyBW...tYx1', limit: 200, used: 142, rate: '71%', status: 'active' },
+        { slot: 2, key: 'AIzaSyAS...uR88', limit: 200, used: 198, rate: '99%', status: 'active' },
+        { slot: 3, key: 'AIzaSyKP...xX90', limit: 200, used: 45,  rate: '22%', status: 'active' },
+        { slot: 4, key: 'AIzaSyTR...kP12', limit: 200, used: 0,   rate: '0%',  status: 'active' },
+        { slot: 5, key: 'AIzaSyLM...uV34', limit: 200, used: 0,   rate: '0%',  status: 'suspended' }
+      ]
+    },
     activities: [
       { name: 'System Update', action: 'v2.4.1 deployed successfully', time: '10m ago', tag: 'now', avatar: '↑', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
       { name: 'New Hub', action: 'Hub-BLR-04 initialized', time: '2h ago', tag: 'recent', avatar: '+', avatarBg: 'bg-blue-500/20', avatarColor: 'text-blue-400' },
@@ -281,6 +308,157 @@ const DB = {
     if (weekNum === 1) return true;
     const progress = await DB.getProgress(userId);
     return progress.completedWeeks.includes(weekNum - 1);
+  },
+
+  // ─── EXAMS API ─────────────────────────────────────────────────────────────
+  getExams: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/exams`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return [];
+  },
+  
+  getExamById: async (examId) => {
+    try {
+      const res = await fetch(`${API_BASE}/exams/${examId}`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return null;
+  },
+
+  createExam: async (examData) => {
+    const res = await fetch(`${API_BASE}/exams`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(examData)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to create exam');
+    }
+    return await res.json();
+  },
+
+  addQuestions: async (examId, questions) => {
+    const res = await fetch(`${API_BASE}/exams/questions`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ examId, questions })
+    });
+    return await res.json();
+  },
+
+  aiGenerateQuestions: async (params) => {
+    const res = await fetch(`${API_BASE}/exams/generate-ai`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to generate questions');
+    }
+    return await res.json();
+  },
+
+  publishExam: async (examId) => {
+    const res = await fetch(`${API_BASE}/exams/${examId}/publish`, {
+      method: 'PUT',
+      headers: getAuthHeaders()
+    });
+    return await res.json();
+  },
+
+  deleteExam: async (examId) => {
+    const res = await fetch(`${API_BASE}/exams/${examId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return await res.json();
+  },
+
+  startExamAttempt: async (examId) => {
+    const res = await fetch(`${API_BASE}/exams/attempts/start`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ examId })
+    });
+    return await res.json();
+  },
+
+  getExamAttempt: async (examId) => {
+    const res = await fetch(`${API_BASE}/exams/attempts/${examId}`, {
+      headers: getAuthHeaders()
+    });
+    return await res.json();
+  },
+
+  saveExamProgress: async (attemptId, answers, securityFlags) => {
+    const res = await fetch(`${API_BASE}/exams/attempts/save`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ attemptId, answers, securityFlags })
+    });
+    return await res.json();
+  },
+
+  submitExam: async (attemptId, answers) => {
+    const res = await fetch(`${API_BASE}/results/submit`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ attemptId, answers })
+    });
+    return await res.json();
+  },
+
+  getStudentResults: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/results/student`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return [];
+  },
+
+  getStudentResultByExam: async (examId) => {
+    try {
+      const res = await fetch(`${API_BASE}/results/student/exam/${examId}`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return null;
+  },
+
+  getExamAttempts: async (examId) => {
+    try {
+      const res = await fetch(`${API_BASE}/results/attempts/exam/${examId}`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return [];
+  },
+
+  getAttemptEvaluation: async (attemptId) => {
+    try {
+      const res = await fetch(`${API_BASE}/results/attempts/eval/${attemptId}`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return null;
+  },
+
+  saveManualEvaluation: async (attemptId, gradedAnswers) => {
+    const res = await fetch(`${API_BASE}/results/attempts/eval`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ attemptId, gradedAnswers })
+    });
+    return await res.json();
+  },
+
+  getExamAnalytics: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/results/analytics`, { headers: getAuthHeaders() });
+      if (res.ok) return await res.json();
+    } catch { /* fall through */ }
+    return null;
   },
 };
 

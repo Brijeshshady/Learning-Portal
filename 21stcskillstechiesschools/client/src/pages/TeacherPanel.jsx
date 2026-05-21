@@ -13,6 +13,9 @@ import { submitGrade, submitAssignment, exportCSV, addNotification, markAttendan
 import Modal from '../components/Modal';
 import html2pdf from 'html2pdf.js';
 import CertificateTemplate from '../components/CertificateTemplate';
+import CreateExam from './CreateExam';
+import ManageExams from './ManageExams';
+import EvaluateAnswers from './EvaluateAnswers';
 
 
 
@@ -104,7 +107,7 @@ const StudentsView = ({ students }) => {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="bg-zinc-950 border border-zinc-850 w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh]"
+                className="bg-zinc-950 border border-zinc-800 w-full max-w-4xl rounded-[2rem] shadow-2xl overflow-hidden pointer-events-auto flex flex-col max-h-[85vh]"
               >
                 {/* Header Profile Card */}
                 <div className="relative p-8 border-b border-zinc-800/80 bg-gradient-to-r from-blue-950/20 via-zinc-950 to-purple-950/10 shrink-0">
@@ -125,7 +128,7 @@ const StudentsView = ({ students }) => {
                         <span className="text-[9px] font-black uppercase tracking-widest bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded-md">
                           Grade {selectedStudent.grade}
                         </span>
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-zinc-850 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md">
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-zinc-800 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded-md">
                           Student
                         </span>
                       </div>
@@ -1275,6 +1278,9 @@ const TeacherPanel = () => {
     students: <StudentsView students={students} />, 
     pending:  <PendingView />,
     submissions: <SubmissionsView students={students} />, 
+    exams: <ManageExams />,
+    'create-exam': <CreateExam />,
+    'evaluate-answers': <EvaluateAnswers />,
     curriculum: <CurriculumView />, 
     attendance: <AttendanceView students={students} />,
     certificates: <CertificatesView students={students} /> 

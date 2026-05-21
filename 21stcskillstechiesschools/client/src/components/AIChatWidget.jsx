@@ -8,16 +8,114 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { addNotification } from '../lib/store';
 
+const parseInlineBold = (str) => {
+  if (!str) return '';
+  const boldParts = str.split(/(\*\*.*?\*\*)/g);
+  return boldParts.map((bp, bpi) => {
+    if (bp.startsWith('**') && bp.endsWith('**')) {
+      return <strong key={bpi} className="font-extrabold text-white">{bp.substring(2, bp.length - 2)}</strong>;
+    }
+    // Handle inline code `code`
+    const codeParts = bp.split(/(`.*?`)/g);
+    return codeParts.map((cp, cpi) => {
+      if (cp.startsWith('`') && cp.endsWith('`')) {
+        return <code key={cpi} className="font-mono text-xs bg-white/10 px-1.5 py-0.5 rounded text-emerald-400 font-bold">{cp.substring(1, cp.length - 1)}</code>;
+      }
+      return cp;
+    });
+  });
+};
+
+const RenderMarkdown = ({ text }) => {
+  if (!text) return null;
+
+  // Split by code blocks
+  const parts = text.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-2">
+      {parts.map((part, index) => {
+        if (part.startsWith('```')) {
+          const lines = part.split('\n');
+          const firstLine = lines[0];
+          const lang = firstLine.replace('```', '').trim() || 'code';
+          const code = lines.slice(1, -1).join('\n');
+          
+          return (
+            <div key={index} className="my-3 bg-zinc-950/90 border border-white/5 rounded-xl p-3 font-mono text-xs overflow-x-auto text-emerald-400 relative">
+              <div className="flex justify-between items-center text-[9px] text-zinc-500 uppercase tracking-widest border-b border-white/5 pb-1 mb-2 font-sans font-black">
+                <span>{lang}</span>
+              </div>
+              <pre className="whitespace-pre overflow-x-auto leading-relaxed">{code}</pre>
+            </div>
+          );
+        } else {
+          const lines = part.split('\n');
+          return lines.map((line, lineIndex) => {
+            const trimmed = line.trim();
+            if (!trimmed) return <div key={lineIndex} className="h-2" />;
+
+            if (trimmed.startsWith('###')) {
+              return <h4 key={lineIndex} className="text-xs font-black text-white mt-3 mb-1 uppercase tracking-wider">{trimmed.replace('###', '').trim()}</h4>;
+            }
+            if (trimmed.startsWith('##')) {
+              return <h3 key={lineIndex} className="text-sm font-black text-white mt-4 mb-2 uppercase tracking-wider">{trimmed.replace('##', '').trim()}</h3>;
+            }
+            if (trimmed.startsWith('#')) {
+              return <h2 key={lineIndex} className="text-base font-black text-white mt-4 mb-2 uppercase tracking-wider">{trimmed.replace('#', '').trim()}</h2>;
+            }
+
+            if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+              const content = trimmed.substring(2);
+              return (
+                <div key={lineIndex} className="flex items-start gap-2 pl-1.5 text-zinc-300 text-xs">
+                  <span className="text-secondary mt-1.5 shrink-0 w-1 h-1 rounded-full bg-secondary" />
+                  <span className="leading-relaxed">{parseInlineBold(content)}</span>
+                </div>
+              );
+            }
+
+            return <p key={lineIndex} className="text-zinc-300 leading-relaxed text-xs">{parseInlineBold(line)}</p>;
+          });
+        }
+      })}
+    </div>
+  );
+};
+
 const AIChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [message, setMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', text: 'Hi! I am your 21stc AI Mentor. How can I help you today?' }
-  ]);
+  const [chatHistory, setChatHistory] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef(null);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      let welcomeMsg = `Hi ${user.name}! I am your 21stc AI Mentor. How can I help you today?`;
+      let initialSuggestions = ["Tell me about Python", "What is Robotics?", "What are Neural Networks?", "My Weekly Roadmap"];
+      
+      if (user.role === 'admin') {
+        welcomeMsg = `Hello ${user.name} (Super Admin). I am connected to the 21stc System Engine. How can I assist you with system monitoring, license deployment, or diagnostic actions today?`;
+        initialSuggestions = ["Check Cluster Health", "Review AI Keys Status", "Show Diagnostics Commands"];
+      } else if (user.role === 'school-admin') {
+        welcomeMsg = `Hello ${user.name} (Hub Admin). I am connected to your school's database. I can assist you with managing institution users, student/teacher enrollment quotas, system license codes, or status reports. How can I help you?`;
+        initialSuggestions = ["Show Hub Quotas", "Active License Status", "Maintenance Modes Info"];
+      } else if (user.role === 'teacher') {
+        welcomeMsg = `Hello ${user.name} (Teacher Assistant). I am your instructional AI assistant. I can help you with student roster analytics, grading details, 36-week curriculum content, or issuing certificates. What would you like to review today?`;
+        initialSuggestions = ["Curriculum Breakdown", "Class Progress Summary", "How to issue Certificates"];
+      }
+      
+      setChatHistory(prev => {
+        if (prev.length <= 1) {
+          return [{ role: 'ai', text: welcomeMsg, suggestions: initialSuggestions }];
+        }
+        return prev;
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -25,13 +123,15 @@ const AIChatWidget = () => {
     }
   }, [chatHistory, isTyping]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!message.trim()) return;
+  const handleSend = async (e, directText) => {
+    if (e) e.preventDefault();
+    const textToSend = directText || message;
+    if (!textToSend.trim()) return;
 
-    const userMsg = message;
-    setMessage('');
-    setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
+    if (!directText) {
+      setMessage('');
+    }
+    setChatHistory(prev => [...prev, { role: 'user', text: textToSend }]);
     setIsTyping(true);
 
     try {
@@ -42,7 +142,7 @@ const AIChatWidget = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: userMsg })
+        body: JSON.stringify({ message: textToSend })
       });
       
       if (res.ok) {
@@ -82,7 +182,7 @@ const AIChatWidget = () => {
           </motion.button>
         )}
       </AnimatePresence>
-
+ 
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -143,7 +243,7 @@ const AIChatWidget = () => {
                         ? 'bg-secondary/10 border border-secondary/20 text-white rounded-tr-none' 
                         : 'bg-white/5 border border-white/10 text-zinc-200 rounded-tl-none'
                     } text-sm leading-relaxed`}>
-                      {msg.text}
+                      {msg.role === 'ai' ? <RenderMarkdown text={msg.text} /> : msg.text}
                     </div>
 
                     {/* Rich Content (Inspired by User Image) */}
@@ -197,7 +297,7 @@ const AIChatWidget = () => {
                         {msg.suggestions.map((s, si) => (
                           <button 
                             key={si}
-                            onClick={() => { setMessage(s); }}
+                            onClick={() => handleSend(null, s)}
                             className="text-[10px] font-bold text-secondary bg-secondary/5 border border-secondary/20 px-3 py-1.5 rounded-full hover:bg-secondary/10 transition-colors flex items-center gap-1"
                           >
                             {s}

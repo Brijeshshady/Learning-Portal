@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Users, ShieldCheck, Key, BarChart3, PlusCircle, Upload,
   Search, Database, Activity, BadgeCheck, Settings as SettingsIcon,
-  TrendingUp, Download, Copy, AlertTriangle, Cpu, CheckCircle2, AlertCircle, Award, Trash2, Calendar, Lock, UserCheck, FileText, MapPin, Zap
+  TrendingUp, Download, Copy, AlertTriangle, Cpu, CheckCircle2, AlertCircle, Award, Trash2, Calendar, Lock, UserCheck, FileText, MapPin, Zap, Server, HardDrive
 } from 'lucide-react';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -15,11 +15,13 @@ import Modal from '../components/Modal';
 import useStore from '../hooks/useStore';
 import { addUser, removeUser, updateUser, addHub, updateHub, removeHub, exportCSV, generateLicenseKey, addNotification, setMaintenanceMode, setHubMaintenance, getState, markAttendance } from '../lib/store';
 import DB from '../lib/db';
+import ExamAnalytics from './ExamAnalytics';
+
 
 
 
 /* ── Dashboard Overview ──────────────────────────────────── */
-const DashboardView = ({ stats }) => {
+const DashboardView = ({ stats, onNavigate }) => {
   const { hubs, users } = useStore();
   const studentCount = users.filter(u => u.role === 'student').length;
   
@@ -29,14 +31,470 @@ const DashboardView = ({ stats }) => {
       <KpiGrid>
         <KpiCard label="Total Students"  value={studentCount.toLocaleString()}  change={stats?.kpis?.studentsChange || "+0%"} icon={Users}    iconBg="bg-primary/15"   iconColor="text-primary"   delay={0.05} />
         <KpiCard label="Active Hubs"     value={hubs.length}     change={stats?.kpis?.hubsChange || "0"}     changeLabel="new this term" icon={Database}  iconBg="bg-emerald-500/15" iconColor="text-emerald-400" delay={0.1} />
-        <KpiCard label="System Health"   value={stats?.kpis?.systemUptime || "99.9%"} change={stats?.kpis?.uptimeChange || "0.1%"} icon={BarChart3} iconBg="bg-secondary/15" iconColor="text-secondary"  delay={0.15} />
+        <div onClick={() => onNavigate('system')} className="cursor-pointer hover:scale-[1.02] transition-transform duration-250">
+          <KpiCard label="System Health"   value={stats?.kpis?.systemUptime || "99.9%"} change={stats?.kpis?.uptimeChange || "0.1%"} icon={BarChart3} iconBg="bg-secondary/15" iconColor="text-secondary"  delay={0.15} />
+        </div>
         <KpiCard label="ARR"             value={stats?.kpis?.mrr || "$124K"}   change={stats?.kpis?.mrrChange || "+8%"}  icon={Cpu}       iconBg="bg-amber-500/15" iconColor="text-amber-400"  delay={0.2} />
       </KpiGrid>
-    <ChartRow>
-      <AreaChartCard title="Enrollment Growth" subtitle="Monthly student registrations across all hubs" data={stats?.enrollmentData || []} dataKey="value" color="#3b82f6" delay={0.2} />
-      <BarChartCard  title="System Load"       subtitle="Server CPU utilization across network nodes"   data={stats?.performanceData || []}  dataKey="cpu" color="#7c3aed" delay={0.25} />
-    </ChartRow>
-    <ActivityFeed title="System Activity" subtitle="Latest platform events and updates" items={stats?.activities || []} delay={0.3} />
+      <ChartRow>
+        <AreaChartCard title="Enrollment Growth" subtitle="Monthly student registrations across all hubs" data={stats?.enrollmentData || []} dataKey="value" color="#3b82f6" delay={0.2} />
+        <div onClick={() => onNavigate('system')} className="cursor-pointer hover:scale-[1.01] transition-transform duration-250 w-full h-full">
+          <BarChartCard  title="System Load"       subtitle="Server CPU utilization across network nodes"   data={stats?.performanceData || []}  dataKey="cpu" color="#7c3aed" delay={0.25} />
+        </div>
+      </ChartRow>
+      <ActivityFeed title="System Activity" subtitle="Latest platform events and updates" items={stats?.activities || []} delay={0.3} />
+    </div>
+  );
+};
+
+/* ── System Monitor View ─────────────────────────────────── */
+const SystemMonitorView = ({ stats }) => {
+  const [activeSubTab, setActiveSubTab] = React.useState('compute'); // 'compute', 'data', 'network'
+  const [keys, setKeys] = React.useState(stats?.aiUsageStats?.keysStatus || [
+    { slot: 1, key: 'AIzaSyBW...tYx1', limit: 200, used: 142, rate: '71%', status: 'active' },
+    { slot: 2, key: 'AIzaSyAS...uR88', limit: 200, used: 198, rate: '99%', status: 'active' },
+    { slot: 3, key: 'AIzaSyKP...xX90', limit: 200, used: 45,  rate: '22%', status: 'active' },
+    { slot: 4, key: 'AIzaSyTR...kP12', limit: 200, used: 0,   rate: '0%',  status: 'active' },
+    { slot: 5, key: 'AIzaSyLM...uV34', limit: 200, used: 0,   rate: '0%',  status: 'suspended' }
+  ]);
+
+  const [actions, setActions] = React.useState({
+    redis: { loading: false, done: false },
+    db: { loading: false, done: false },
+    gateway: { loading: false, done: false }
+  });
+
+  const toggleKey = (slotNum) => {
+    setKeys(prevKeys => prevKeys.map(k => {
+      if (k.slot === slotNum) {
+        const nextStatus = k.status === 'active' ? 'suspended' : 'active';
+        return { ...k, status: nextStatus };
+      }
+      return k;
+    }));
+    addNotification({ title: 'AI Router Updated', body: `Gemini API key slot ${slotNum} modified.`, type: 'info' });
+  };
+
+  const runAction = (type, label, msg) => {
+    setActions(prev => ({ ...prev, [type]: { loading: true, done: false } }));
+    setTimeout(() => {
+      setActions(prev => ({ ...prev, [type]: { loading: false, done: true } }));
+      addNotification({ title: label, body: msg, type: 'success' });
+    }, 2000);
+  };
+
+  const nodes = stats?.performanceData || [
+    { name: 'Node A (Chennai Core)', cpu: 45, mem: 60, connections: 840, latency: 12, disk: 18, status: 'healthy' },
+    { name: 'Node B (Coimbatore Core)', cpu: 75, mem: 82, connections: 1202, latency: 38, disk: 44, status: 'warning' },
+    { name: 'Node C (Regional Router)', cpu: 30, mem: 45, connections: 450, latency: 15, disk: 12, status: 'healthy' },
+    { name: 'DB Sync (Master Node)', cpu: 88, mem: 95, connections: 345, latency: 45, disk: 78, status: 'critical' }
+  ];
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white">System Monitor & Command Deck</h2>
+          <p className="text-zinc-500 text-sm mt-1">Multi-region performance metrics and fallback router control.</p>
+        </div>
+      </div>
+
+      {/* Cluster Nodes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {nodes.map(n => {
+          const statusColors = {
+            healthy: {
+              border: 'border-emerald-500/20',
+              glow: 'hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.08)] hover:border-emerald-500/30',
+              text: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+              bar: 'from-emerald-500 to-teal-400'
+            },
+            warning: {
+              border: 'border-amber-500/20',
+              glow: 'hover:shadow-[0_0_25px_-5px_rgba(245,158,11,0.08)] hover:border-amber-500/30',
+              text: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+              bar: 'from-amber-500 to-orange-400'
+            },
+            critical: {
+              border: 'border-rose-500/25',
+              glow: 'hover:shadow-[0_0_30px_-5px_rgba(239,68,68,0.12)] hover:border-rose-500/40',
+              text: 'text-rose-400 bg-rose-500/10 border-rose-500/20 animate-pulse',
+              bar: 'from-rose-600 to-pink-500'
+            }
+          };
+          const currentColors = statusColors[n.status] || statusColors.healthy;
+
+          return (
+            <motion.div
+              key={n.name}
+              whileHover={{ y: -4, scale: 1.01 }}
+              transition={{ duration: 0.2 }}
+              className={`bg-zinc-950/40 backdrop-blur-md border ${currentColors.border} rounded-2xl p-5 hover:bg-zinc-950/60 transition-all duration-300 ${currentColors.glow}`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 truncate max-w-[150px] flex items-center gap-1.5">
+                  <Server className="w-3.5 h-3.5 text-zinc-500" />
+                  {n.name}
+                </span>
+                <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border tracking-wider flex items-center gap-1 ${currentColors.text}`}>
+                  <span className={`w-1 h-1 rounded-full bg-current ${n.status === 'critical' ? 'animate-ping' : ''}`} />
+                  {n.status}
+                </span>
+              </div>
+              
+              <div className="space-y-3">
+                {/* CPU usage */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                    <span>CPU Load</span>
+                    <span className="text-white font-mono">{n.cpu}%</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${n.cpu}%` }}
+                      transition={{ duration: 1.2, ease: "easeOut" }}
+                      className={`h-full rounded-full bg-gradient-to-r ${currentColors.bar}`}
+                    />
+                  </div>
+                </div>
+
+                {/* MEM usage */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                    <span>Memory</span>
+                    <span className="text-white font-mono">{n.mem}%</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${n.mem}%` }}
+                      transition={{ duration: 1.2, ease: "easeOut" }}
+                      className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Disk usage */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[9px] font-bold text-zinc-500 uppercase">
+                    <span>Disk Usage</span>
+                    <span className="text-white font-mono">{n.disk}%</span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${n.disk}%` }}
+                      transition={{ duration: 1.2, ease: "easeOut" }}
+                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-fuchsia-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Additional stats */}
+                <div className="pt-2 border-t border-zinc-900/60 grid grid-cols-2 gap-2 text-[9px] font-black uppercase text-zinc-500">
+                  <div>
+                    <span className="block text-zinc-500 text-[8px] tracking-wider mb-0.5">Active Clients</span>
+                    <span className="text-white font-mono text-xs">{n.connections.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="block text-zinc-500 text-[8px] tracking-wider mb-0.5">Ping Latency</span>
+                    <span className="text-white font-mono text-xs">{n.latency}ms</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Main Grid: Control Deck + Sub-panel tabs */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Side: Sub-panels tab deck */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
+            <div className="flex justify-between items-center border-b border-zinc-900 pb-4 mb-6">
+              <div className="flex items-center gap-1 bg-zinc-950/60 p-1 rounded-xl border border-zinc-900">
+                {[
+                  { id: 'compute', label: 'Computing' },
+                  { id: 'data', label: 'Data Layer' },
+                  { id: 'network', label: 'Network & AI' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveSubTab(tab.id)}
+                    className="relative px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                  >
+                    {activeSubTab === tab.id && (
+                      <motion.div
+                        layoutId="activeSubTabIndicator"
+                        className="absolute inset-0 bg-gradient-to-r from-primary to-blue-600 rounded-lg shadow-md shadow-primary/25"
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                    <span className={`relative z-10 transition-colors ${activeSubTab === tab.id ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                      {tab.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TAB CONTENT: Compute */}
+            {activeSubTab === 'compute' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl space-y-2 hover:border-zinc-800 transition-all duration-300">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-primary" />
+                      Core Performance Index
+                    </p>
+                    <p className="text-3xl font-headline font-black text-white">4.88 <span className="text-xs text-emerald-400 font-bold font-sans">/ 5.00 Optimal</span></p>
+                  </div>
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl space-y-2 hover:border-zinc-800 transition-all duration-300">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-orange-400" />
+                      Average Node Temp
+                    </p>
+                    <p className="text-3xl font-headline font-black text-white">42°C <span className="text-xs text-emerald-400 font-bold font-sans">Stable</span></p>
+                  </div>
+                </div>
+                
+                <div className="bg-zinc-950/60 p-5 border border-zinc-900 rounded-2xl space-y-4">
+                  <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Background Worker Queues
+                    </p>
+                    <span className="text-[8px] font-mono text-zinc-500 uppercase">Process ID: 89402</span>
+                  </div>
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="flex justify-between items-center p-2 rounded-lg hover:bg-zinc-900/30 transition-colors">
+                      <span className="text-zinc-400 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        PDF Generator Jobs:
+                      </span>
+                      <span className="text-emerald-400 font-bold">0 Idle</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 rounded-lg hover:bg-zinc-900/30 transition-colors">
+                      <span className="text-zinc-400 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        Email SMTP Relays:
+                      </span>
+                      <span className="text-emerald-400 font-bold">2 Queue</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 rounded-lg hover:bg-zinc-900/30 transition-colors">
+                      <span className="text-zinc-400 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        AI Logs Parser:
+                      </span>
+                      <span className="text-amber-400 font-bold">18 Processing</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: Data */}
+            {activeSubTab === 'data' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl text-center hover:border-zinc-800 transition-all duration-300">
+                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">DB Latency</span>
+                    <p className="text-2xl font-black text-white mt-1 font-mono">4.2ms</p>
+                  </div>
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl text-center hover:border-zinc-800 transition-all duration-300">
+                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Cache Hits</span>
+                    <p className="text-2xl font-black text-emerald-400 mt-1 font-mono">98.4%</p>
+                  </div>
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl text-center hover:border-zinc-800 transition-all duration-300">
+                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Storage Used</span>
+                    <p className="text-2xl font-black text-white mt-1 font-mono">42.8 GB</p>
+                  </div>
+                </div>
+                
+                <div className="bg-zinc-950/60 p-5 border border-zinc-900 rounded-2xl space-y-3">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                    <span className="flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-primary" />
+                      Active MongoDB Client Pool
+                    </span>
+                    <span className="text-white font-mono">45 / 100 Connections</span>
+                  </div>
+                  <div className="h-2.5 bg-zinc-900 rounded-full overflow-hidden p-[1px] border border-zinc-800">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: '45%' }}
+                      transition={{ duration: 1, ease: 'easeOut' }}
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: Network & AI */}
+            {activeSubTab === 'network' && (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl space-y-1 hover:border-zinc-800 transition-all">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                      <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                      Total API Token Requests
+                    </span>
+                    <p className="text-2xl font-black text-white font-mono">{(stats?.aiUsageStats?.totalRequests || 84293).toLocaleString()}</p>
+                  </div>
+                  <div className="bg-zinc-950/60 p-4 border border-zinc-900 rounded-2xl space-y-1 hover:border-zinc-800 transition-all">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                      Estimated Token Savings
+                    </span>
+                    <p className="text-2xl font-black text-emerald-400 font-mono">{(stats?.aiUsageStats?.costSavingsPct || 92)}% via caching</p>
+                  </div>
+                </div>
+
+                {/* API Key Load Balancer Deck */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-primary" />
+                      Gemini Key Balance Deck
+                    </p>
+                    <span className="text-[9px] text-zinc-500 font-bold bg-zinc-950 px-2.5 py-1 rounded-full border border-zinc-900 font-mono">
+                      {keys.filter(k => k.status === 'active').length} of {keys.length} Active Slots
+                    </span>
+                  </div>
+                  <div className="bg-zinc-950 border border-zinc-900 rounded-2xl overflow-hidden divide-y divide-zinc-900/60">
+                    {keys.map(k => (
+                      <div key={k.slot} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-zinc-900/25 transition-all">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-2 h-2 rounded-full ${k.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs text-primary font-mono font-black">Slot {k.slot}</code>
+                            <code className="text-[11px] text-zinc-500 font-mono select-all bg-zinc-950/80 px-2 py-0.5 rounded border border-zinc-900/60">{k.key}</code>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
+                          <div className="text-right">
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 font-mono">Used: {k.used} / {k.limit} tokens</p>
+                            <div className="w-24 h-1.5 bg-zinc-900 rounded-full mt-1.5 overflow-hidden p-[1px] border border-zinc-800">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${k.status === 'suspended' ? 'bg-zinc-600' : k.used > 190 ? 'bg-gradient-to-r from-rose-500 to-pink-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
+                                style={{ width: `${(k.used/k.limit)*100}%` }}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => toggleKey(k.slot)}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all ${
+                              k.status === 'active'
+                                ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white'
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white'
+                            }`}
+                          >
+                            {k.status === 'active' ? 'Suspend' : 'Resume'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Side: Command controls */}
+        <div className="space-y-6">
+          <div className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-[2rem] p-6 shadow-xl space-y-6">
+            <div>
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <SettingsIcon className="w-4 h-4 text-primary" />
+                Command Diagnostics
+              </h3>
+              <p className="text-xs text-zinc-500 font-medium mt-0.5">Deploy emergency controls and synchronize routing indices.</p>
+            </div>
+            <div className="space-y-4">
+              {[
+                {
+                  id: 'redis',
+                  title: 'Flush Cache Layer',
+                  desc: 'Purges stale Redis tokens, session histories, and local cache layers.',
+                  icon: Trash2,
+                  iconColor: 'text-rose-400 bg-rose-500/10 border border-rose-500/20',
+                  buttonText: 'Flush Caching Layer',
+                  loadingText: 'Flushing Redis cache...',
+                  doneText: 'Flushed Successfully',
+                  successMsg: 'Successfully cleared 14,839 cached schema entries.',
+                  actionLabel: 'Redis cache layer flushed'
+                },
+                {
+                  id: 'db',
+                  title: 'Optimize DB Indexing',
+                  desc: 'Triggers MongoDB defragmentation and updates document search index bindings.',
+                  icon: Database,
+                  iconColor: 'text-amber-400 bg-amber-500/10 border border-amber-500/20',
+                  buttonText: 'Optimize DB Indices',
+                  loadingText: 'Optimizing DB indices...',
+                  doneText: 'Optimized Successfully',
+                  successMsg: 'Completed MongoDB collection index compression.',
+                  actionLabel: 'Database optimized successfully'
+                },
+                {
+                  id: 'gateway',
+                  title: 'Reset Gateway Router',
+                  desc: 'Force recycles regional edge router WebSocket listeners.',
+                  icon: Zap,
+                  iconColor: 'text-blue-400 bg-blue-500/10 border border-blue-500/20',
+                  buttonText: 'Reset Gateway Router',
+                  loadingText: 'Recycling edge gateway...',
+                  doneText: 'Gateway Reset Successful',
+                  successMsg: 'Router socket connections successfully recycled.',
+                  actionLabel: 'Regional edge gateway restarted'
+                }
+              ].map(act => {
+                const isActLoading = actions[act.id].loading;
+                const isActDone = actions[act.id].done;
+                const IconComponent = act.icon;
+
+                return (
+                  <div key={act.id} className="p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-3 hover:border-zinc-800 transition-all duration-300">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${act.iconColor}`}>
+                        <IconComponent className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-wider">{act.title}</h4>
+                        <p className="text-[10px] text-zinc-500 leading-relaxed mt-0.5">{act.desc}</p>
+                      </div>
+                    </div>
+                    <button
+                      disabled={isActLoading}
+                      onClick={() => runAction(act.id, act.actionLabel, act.successMsg)}
+                      className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 border ${
+                        isActLoading
+                          ? 'bg-zinc-900/50 border-primary/30 text-primary cursor-wait'
+                          : isActDone
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white'
+                          : 'bg-zinc-900 border-zinc-800 hover:border-primary/40 text-zinc-400 hover:text-white hover:shadow-[0_0_15px_rgba(59,130,246,0.08)]'
+                      }`}
+                    >
+                      {isActLoading && (
+                        <svg className="animate-spin h-3.5 w-3.5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                      {isActLoading ? act.loadingText : isActDone ? act.doneText : act.buttonText}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -109,29 +567,114 @@ const UsersView = () => {
         </div>
       </div>
       
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-        <div className="p-4 border-b border-zinc-800">
-          <div className="relative w-80">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, or hub…" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-all" />
+      <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] overflow-hidden">
+        <div className="p-6 border-b border-zinc-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/40">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+            <input 
+              type="text" 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              placeholder="Search by name, email, or hub…" 
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary/50 transition-all" 
+            />
           </div>
+          <span className="text-[9px] font-black bg-zinc-800/60 border border-zinc-700 px-3 py-1.5 rounded-lg text-zinc-400 uppercase tracking-widest self-start md:self-auto">
+            {filteredUsers.length} active records
+          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="border-b border-zinc-800 bg-zinc-900/60">
-              <tr>{['Full Name', 'Institution', 'Role', 'Status', 'Actions'].map((h) => (
-                <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-white/[0.01] transition-all">
-                  <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-xs">{u.name[0]}</div><div><p className="text-sm font-bold text-white">{u.name}</p><p className="text-[10px] text-zinc-500">{u.email}</p></div></div></td>
-                  <td className="px-6 py-4 text-xs text-zinc-500 font-bold">{u.schoolId || '—'}</td>
-                  <td className="px-6 py-4"><span className="text-[9px] font-black bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg text-zinc-400 uppercase tracking-widest">{u.role}</span></td>
-                  <td className="px-6 py-4"><div className="flex items-center gap-1.5">{u.status === 'active' ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-black text-emerald-500 uppercase">Active</span></> : <><AlertCircle className="w-3.5 h-3.5 text-zinc-500" /><span className="text-[10px] font-black text-zinc-500 uppercase">Inactive</span></>}</div></td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    <button onClick={() => handleOpenEdit(u)} className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-600 text-zinc-400 hover:text-white transition-all">Edit</button>
+        
+        {filteredUsers.length === 0 ? (
+          <div className="px-6 py-16 text-center text-zinc-500 text-sm font-bold">No users found.</div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredUsers.map((u) => {
+              // Role-based design tokens
+              let roleConfig = {
+                badge: 'border-blue-500/20 text-blue-400 bg-blue-500/10',
+                avatarBg: 'bg-gradient-to-tr from-blue-600 to-indigo-500',
+                border: 'border-zinc-800/80 hover:border-blue-500/30 shadow-[0_0_20px_-5px_rgba(59,130,246,0.05)]'
+              };
+              if (u.role === 'teacher') {
+                roleConfig = {
+                  badge: 'border-purple-500/20 text-purple-400 bg-purple-500/10',
+                  avatarBg: 'bg-gradient-to-tr from-purple-600 to-pink-500',
+                  border: 'border-zinc-800/80 hover:border-purple-500/30 shadow-[0_0_20px_-5px_rgba(168,85,247,0.05)]'
+                };
+              } else if (u.role === 'school-admin') {
+                roleConfig = {
+                  badge: 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10',
+                  avatarBg: 'bg-gradient-to-tr from-emerald-600 to-teal-500',
+                  border: 'border-zinc-800/80 hover:border-emerald-500/30 shadow-[0_0_20px_-5px_rgba(16,185,129,0.05)]'
+                };
+              } else if (u.role === 'student') {
+                roleConfig = {
+                  badge: 'border-amber-500/20 text-amber-400 bg-amber-500/10',
+                  avatarBg: 'bg-gradient-to-tr from-amber-500 to-orange-400',
+                  border: 'border-zinc-800/80 hover:border-amber-500/30 shadow-[0_0_20px_-5px_rgba(245,158,11,0.05)]'
+                };
+              }
+              
+              return (
+                <motion.div
+                  key={u.id}
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                  className={`bg-zinc-950/40 border ${roleConfig.border} rounded-2xl p-5 flex flex-col justify-between transition-all duration-300`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl ${roleConfig.avatarBg} flex items-center justify-center text-white font-black text-sm shadow-md`}>
+                          {u.name[0]}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-black text-white truncate max-w-[140px]" title={u.name}>{u.name}</h3>
+                          <p className="text-[10px] text-zinc-500 truncate max-w-[140px]" title={u.email}>{u.email}</p>
+                        </div>
+                      </div>
+                      <span className={`text-[9px] font-black border px-2.5 py-1 rounded-md uppercase tracking-wider shrink-0 ${roleConfig.badge}`}>
+                        {u.role === 'school-admin' ? 'Hub Admin' : u.role}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5 pt-3.5 border-t border-zinc-900/60">
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="font-bold text-zinc-500 uppercase tracking-wider">Institution Hub</span>
+                        <span className="font-bold text-zinc-400 uppercase">{u.schoolId || '—'}</span>
+                      </div>
+                      {u.role === 'student' && u.grade && (
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="font-bold text-zinc-500 uppercase tracking-wider">Grade</span>
+                          <span className="font-bold text-zinc-400 uppercase">Grade {u.grade}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="font-bold text-zinc-500 uppercase tracking-wider">Status</span>
+                        <div className="flex items-center gap-1.5">
+                          {u.status === 'active' ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="font-black text-emerald-500 uppercase tracking-wider">Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-3.5 h-3.5 text-zinc-600" />
+                              <span className="font-black text-zinc-600 uppercase tracking-wider">Inactive</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-5 pt-3.5 border-t border-zinc-900/60">
+                    <button 
+                      onClick={() => handleOpenEdit(u)} 
+                      className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-zinc-700 text-zinc-400 hover:text-white transition-all"
+                    >
+                      Edit
+                    </button>
                     <button 
                       onClick={() => {
                         const adminUser = users.find(x => x.id === 'u0');
@@ -141,17 +684,16 @@ const UsersView = () => {
                         }
                         if(confirm(`Remove ${u.name}?`)) removeUser(u.id);
                       }} 
-                      className="bg-zinc-800 border border-zinc-700 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition-all"
+                      className="bg-zinc-900 border border-zinc-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg hover:border-red-500/30 text-zinc-400 hover:text-red-400 transition-all"
                     >
                       Remove
                     </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredUsers.length === 0 && <tr><td colSpan="5" className="px-6 py-12 text-center text-zinc-500 text-sm font-bold">No users found.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingUser ? "Edit User Profile" : "Provision New User"}>
@@ -753,13 +1295,15 @@ const AdminDashboard = () => {
   }, []);
 
   const views = {
-    dashboard:    <DashboardView stats={stats} />,
+    dashboard:    <DashboardView stats={stats} onNavigate={(v) => setSearchParams({ v })} />,
     users:        <UsersView />,
     schools:      <HubRegistryView />,
     certificates: <CertificatesView />,
     activation:   <LicenseView />,
     attendance:   <SchoolAttendanceView />,
     analytics:    <AnalyticsView />,
+    'exam-analytics': <ExamAnalytics />,
+    system:       <SystemMonitorView stats={stats} />,
   };
 
   return (

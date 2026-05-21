@@ -73,7 +73,7 @@ class AIManager {
         // Fallback to the first slot's error handling to trigger graceful local mock syllabus generation
         console.warn("[AI MANAGER] All attempted slots failed. Triggering local mock fallback.");
         try {
-            return await getAIResponse(message, userContext, this.slots[0].key);
+            return await getAIResponse(message, userContext, this.slots[0].key, true);
         } catch (err) {
             throw lastError || err;
         }

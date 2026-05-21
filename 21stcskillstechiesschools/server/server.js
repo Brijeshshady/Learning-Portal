@@ -271,6 +271,13 @@ app.put('/api/users/profile', protect, async (req, res) => {
     }
 });
 
+// ── EXAMS MODULE ─────────────────────────────────────────────────────────
+const examRoutes = require('./routes/examRoutes');
+const resultRoutes = require('./routes/resultRoutes');
+
+app.use('/api/exams', protect, examRoutes);
+app.use('/api/results', protect, resultRoutes);
+
 // AI Chat Route
 app.post('/api/ai/chat', protect, async (req, res) => {
     try {
@@ -278,8 +285,64 @@ app.post('/api/ai/chat', protect, async (req, res) => {
         const userContext = {
             name: req.user.name,
             grade: req.user.grade || 7,
-            role: req.user.role
+            role: req.user.role,
+            dynamicContext: {}
         };
+
+        // Fetch dynamic context based on user roles
+        if (req.user.role === 'admin') {
+            const schoolCount = await School.countDocuments();
+            const userCount = await User.countDocuments();
+            const tokenCount = await Token.countDocuments();
+            userContext.dynamicContext = {
+                schoolCount,
+                userCount,
+                tokenCount,
+                systemStats: {
+                    nodes: [
+                        { name: "Node-Alpha-East", status: "healthy", cpu: 42, memory: 58, disk: 34 },
+                        { name: "Node-Beta-West", status: "healthy", cpu: 31, memory: 62, disk: 45 },
+                        { name: "Node-Gamma-South", status: "warning", cpu: 89, memory: 91, disk: 78 }
+                    ],
+                    activeKeys: 5,
+                    gatewayStatus: "online",
+                    cacheSize: "2.4 GB",
+                    dbStatus: "optimized",
+                }
+            };
+        } else if (req.user.role === 'school-admin') {
+            const school = await School.findOne({ id: req.user.schoolId });
+            const studentCount = await User.countDocuments({ schoolId: req.user.schoolId, role: 'student' });
+            const teacherCount = await User.countDocuments({ schoolId: req.user.schoolId, role: 'teacher' });
+            const tokens = await Token.find({ schoolId: req.user.schoolId });
+            
+            userContext.dynamicContext = {
+                hubName: school ? school.name : "Unknown Hub",
+                plan: school ? school.plan : "N/A",
+                studentLimit: school ? school.studentLimit : 0,
+                aiLimit: school ? school.aiLimit : 0,
+                studentCount,
+                teacherCount,
+                tokens: tokens.map(t => ({
+                    code: t.code,
+                    usage: t.usage,
+                    limit: t.limit,
+                    expiry: t.expiry
+                }))
+            };
+        } else if (req.user.role === 'teacher') {
+            const studentCount = await User.countDocuments({ schoolId: req.user.schoolId, role: 'student' });
+            const certificatesIssued = await Certificate.countDocuments({ schoolId: req.user.schoolId });
+            const school = await School.findOne({ id: req.user.schoolId });
+            
+            userContext.dynamicContext = {
+                hubName: school ? school.name : "Unknown Hub",
+                studentCount,
+                certificatesIssued,
+                grades: req.user.grades || []
+            };
+        }
+
         const response = await aiManager.getBalancedResponse(message, userContext);
         res.json(response);
     } catch (err) {

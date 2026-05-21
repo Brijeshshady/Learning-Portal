@@ -22,6 +22,7 @@ import {
   Calendar,
   Inbox,
   Trophy,
+  Cpu,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import useStore from '../hooks/useStore';
@@ -42,6 +43,8 @@ const MENUS = {
       { name: 'Attendance',    view: 'attendance',   icon: Calendar },
       { name: 'License Keys',  view: 'activation',icon: Key },
       { name: 'Analytics',     view: 'analytics', icon: Activity },
+      { name: 'Exam Analytics', view: 'exam-analytics', icon: ClipboardList },
+      { name: 'System Monitor', view: 'system',    icon: Cpu },
       { name: 'Community',     route: '/community', icon: MessageSquare },
     ],
   },
@@ -55,6 +58,7 @@ const MENUS = {
       { name: 'Hub Pending',  view: 'pending',    icon: Inbox, badge: true },
       { name: 'Certificates', view: 'certificates', icon: Award },
       { name: 'Reports',      view: 'analytics',  icon: BarChart2 },
+      { name: 'Exam Analytics', view: 'exam-analytics', icon: ClipboardList },
       { name: 'Community',    route: '/community', icon: MessageSquare },
     ],
   },
@@ -67,6 +71,7 @@ const MENUS = {
       { name: 'Attendance',      view: 'attendance',   icon: Calendar },
       { name: 'Pending Inbox',   view: 'pending',      icon: Inbox, badge: true },
       { name: 'Submissions',     view: 'submissions',  icon: ClipboardList },
+      { name: 'Manage Exams',    view: 'exams',        icon: ClipboardList },
       { name: 'Certificates',    view: 'certificates', icon: Award },
       { name: 'Syllabus View',   view: 'curriculum',   icon: BookOpen },
       { name: 'Community',       route: '/community',  icon: MessageSquare },
@@ -77,6 +82,7 @@ const MENUS = {
     accent: { text: 'text-secondary', bg: 'bg-secondary', shadow: 'shadow-secondary/30', ring: 'ring-secondary/20' },
     links: [
       { name: 'Dashboard',        view: 'overview',  icon: LayoutDashboard },
+      { name: 'Exams',            view: 'exams',     icon: ClipboardList },
       { name: 'AI Lab',           view: 'ai-lab',    icon: Bot },
       { name: 'My Projects',      view: 'projects',  icon: Rocket },
       { name: 'Attendance',       view: 'attendance', icon: Calendar },
