@@ -30,22 +30,28 @@ import {
 } from 'recharts';
 import DB from '../lib/db';
 
-const ExamAnalytics = ({ user }) => {
+const ExamAnalytics = ({ user, selectedHub }) => {
   const [analytics, setAnalytics] = useState(null);
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
+  const [hubs, setHubs] = useState([]);
+
+  const isAll = !selectedHub || selectedHub === 'ALL';
+  const hubName = !isAll ? (hubs.find(h => h.id === selectedHub)?.name || selectedHub) : null;
 
   const fetchData = async () => {
     try {
-      const [analyticsData, examsData] = await Promise.all([
+      const [analyticsData, examsData, schoolsData] = await Promise.all([
         DB.getExamAnalytics(),
-        DB.getExams()
+        DB.getExams(),
+        DB.getSchools()
       ]);
       setAnalytics(analyticsData);
       setExams(examsData);
+      setHubs(schoolsData || []);
     } catch (err) {
       console.error("Failed to load exam analytics:", err);
     } finally {
@@ -56,7 +62,7 @@ const ExamAnalytics = ({ user }) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedHub]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -132,6 +138,14 @@ const ExamAnalytics = ({ user }) => {
           Refresh Stats
         </button>
       </div>
+
+      {/* Hub context banner */}
+      {!isAll && (
+        <div className="p-4 bg-secondary/5 border border-secondary/20 rounded-2xl flex items-center gap-3">
+          <BarChart3 className="w-4 h-4 text-secondary shrink-0" />
+          <p className="text-xs font-bold text-zinc-300">Showing exam analytics for <span className="text-secondary font-black">{hubName}</span> ({selectedHub}). Switch to <span className="text-zinc-400 font-bold">All Hubs</span> to see platform-wide exam data.</p>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

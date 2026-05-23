@@ -53,7 +53,7 @@ const MENUS = {
       { name: 'Rollouts',       view: 'rollouts',  icon: Rocket },
       { name: 'Bug Tracker',   view: 'bugs',      icon: Bug },
       { name: 'Submit Bug',     view: 'submit-bug', icon: Bug },
-      { name: 'Community',     route: '/community', icon: MessageSquare },
+      { name: 'Community',     view: 'community', icon: MessageSquare },
     ],
   },
   'school-admin': {

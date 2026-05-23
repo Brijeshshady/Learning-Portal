@@ -330,6 +330,9 @@ const OverviewView = ({ schoolData, stats }) => {
 const RolloutLogView = () => {
   const [rollouts, setRollouts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterChannel, setFilterChannel] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedIds, setExpandedIds] = useState({});
   const { user } = useAuth();
 
   useEffect(() => {
@@ -355,97 +358,179 @@ const RolloutLogView = () => {
     fetchRollouts();
   }, [user]);
 
+  const toggleExpand = (id) => {
+    setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const filteredRollouts = rollouts.filter(r => {
+    const matchChannel = filterChannel === 'all' || r.channel === filterChannel;
+    const matchSearch = r.version.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.description && r.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchChannel && matchSearch;
+  });
+
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div>
-        <h2 className="text-2xl font-black font-headline tracking-tighter text-white flex items-center gap-2">
-          <Rocket className="w-6 h-6 text-emerald-400" /> System Update Log
-        </h2>
-        <p className="text-zinc-500 text-sm mt-1">Review the history of feature rollouts, system patches, and scheduled upgrades delivered to your hub.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white flex items-center gap-2">
+            <Rocket className="w-6 h-6 text-emerald-400" /> System Updates
+          </h2>
+          <p className="text-zinc-500 text-sm mt-1">Review the history of feature rollouts, system patches, and scheduled upgrades delivered to your hub.</p>
+        </div>
+        
+        {/* Controls */}
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+            <input 
+              type="text" 
+              placeholder="Search updates..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all w-40 md:w-48"
+            />
+          </div>
+          {/* Channel Filter */}
+          <select 
+            value={filterChannel} 
+            onChange={(e) => setFilterChannel(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 cursor-pointer focus:outline-none focus:border-emerald-500/50"
+          >
+            <option value="all">All Channels</option>
+            <option value="stable">Stable</option>
+            <option value="beta">Beta</option>
+          </select>
+        </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="border-b border-zinc-800 bg-zinc-950/20">
-              <tr>
-                {['Version', 'Release Details', 'Channel', 'Date Received', 'Scheduled Update', 'Status'].map((h) => (
-                  <th key={h} className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-850">
-              {loading ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">Loading system update log...</td>
-                </tr>
-              ) : rollouts.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No updates rolled out to your hub yet.</td>
-                </tr>
-              ) : (
-                rollouts.map((r) => {
-                  const statusColors = {
-                    pending: 'text-zinc-400 bg-zinc-800 border-zinc-700',
-                    scheduled: 'text-blue-400 bg-blue-500/10 border-blue-500/20 animate-pulse',
-                    applied: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-                    'rolled-back': 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                  };
+      {loading ? (
+        <div className="py-16 text-center text-zinc-500 font-bold text-xs">Loading updates timeline...</div>
+      ) : filteredRollouts.length === 0 ? (
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl py-16 text-center text-zinc-500 font-bold text-xs">No updates match your filters.</div>
+      ) : (
+        /* Timeline Container */
+        <div className="relative pl-6 md:pl-8 border-l border-zinc-850 space-y-6 py-2 ml-4">
+          {filteredRollouts.map((r, idx) => {
+            const isApplied = r.status === 'applied';
+            const isScheduled = r.status === 'scheduled';
+            const isExpanded = !!expandedIds[r.id];
+            
+            // Icon / status config
+            let DotIcon = Clock;
+            let dotColorClass = 'bg-zinc-800 border-zinc-700 text-zinc-500';
+            let pulseClass = '';
+            
+            if (isApplied) {
+              DotIcon = CheckCircle2;
+              dotColorClass = 'bg-emerald-950 border-emerald-500/50 text-emerald-400';
+            } else if (isScheduled) {
+              DotIcon = Calendar;
+              dotColorClass = 'bg-blue-950 border-blue-500/50 text-blue-400';
+              pulseClass = 'animate-pulse';
+            } else if (r.status === 'rolled-back') {
+              DotIcon = AlertCircle;
+              dotColorClass = 'bg-rose-950 border-rose-500/50 text-rose-400';
+            }
 
-                  return (
-                    <tr key={r.id} className="hover:bg-white/[0.01] transition-all">
-                      <td className="px-6 py-4">
-                        <code className="text-sm font-black font-mono text-emerald-400">{r.version}</code>
-                      </td>
-                      <td className="px-6 py-4 max-w-sm">
-                        <div className="space-y-1">
-                          <p className="text-xs font-black text-white">{r.title}</p>
-                          {r.description && <p className="text-[11px] text-zinc-400 leading-relaxed">{r.description}</p>}
-                          {r.changelog && r.changelog.length > 0 && (
-                            <ul className="list-disc pl-4 mt-1.5 space-y-0.5 text-[10px] text-zinc-500">
-                              {r.changelog.map((item, idx) => (
-                                <li key={idx}>{item}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-[8px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded border ${
+            return (
+              <div key={r.id} className="relative">
+                {/* Timeline dot */}
+                <div className={`absolute -left-[35px] md:-left-[43px] top-1.5 w-6 h-6 rounded-full border flex items-center justify-center z-10 shadow-lg ${dotColorClass} ${pulseClass}`}>
+                  <DotIcon className="w-3.5 h-3.5" />
+                </div>
+
+                {/* Timeline Card */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: idx * 0.05 }}
+                  className="bg-zinc-950/40 backdrop-blur-md border border-zinc-900 hover:border-zinc-800 rounded-2xl p-5 md:p-6 transition-all duration-300 shadow-xl relative overflow-hidden group"
+                >
+                  {/* Subtle hover gradient background */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/[0.01] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+                  {/* Header Row */}
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 border-b border-zinc-900/60 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <code className="text-xs font-black font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                          {r.version}
+                        </code>
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
                           r.channel === 'stable' 
                             ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
                             : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
                         }`}>
                           {r.channel}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-[10px] font-mono text-zinc-500">
-                        {new Date(r.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-[10px] font-mono text-zinc-400">
-                          {r.status === 'applied' && r.appliedAt ? (
-                            <span className="text-emerald-400 font-bold">Applied: {new Date(r.appliedAt).toLocaleString()}</span>
-                          ) : r.scheduledAt ? (
-                            <span>Scheduled: {new Date(r.scheduledAt).toLocaleString()}</span>
-                          ) : (
-                            <span className="text-zinc-650">Pending Schedule</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${statusColors[r.status] || statusColors.pending}`}>
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                          isApplied 
+                            ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                            : isScheduled
+                            ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                            : r.status === 'rolled-back'
+                            ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                            : 'text-zinc-400 bg-zinc-800 border-zinc-700'
+                        }`}>
                           {r.status}
                         </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      </div>
+                      <h3 className="text-base font-black font-headline text-white mt-2 tracking-tight">{r.title}</h3>
+                    </div>
+
+                    <div className="flex flex-col items-start md:items-end gap-1 shrink-0 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                      <p className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-zinc-600" /> Released: {new Date(r.createdAt).toLocaleDateString()}</p>
+                      {isApplied && r.appliedAt ? (
+                        <p className="text-emerald-400/90 font-black">Applied: {new Date(r.appliedAt).toLocaleString()}</p>
+                      ) : r.scheduledAt ? (
+                        <p className="text-blue-400/90 font-black">Scheduled: {new Date(r.scheduledAt).toLocaleString()}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Body description */}
+                  <div className="mt-4">
+                    {r.description && <p className="text-xs text-zinc-400 leading-relaxed">{r.description}</p>}
+                  </div>
+
+                  {/* Changelog Accordion */}
+                  {r.changelog && r.changelog.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-zinc-900/60">
+                      <button 
+                        onClick={() => toggleExpand(r.id)}
+                        className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+                      >
+                        {isExpanded ? 'Hide Changelog Details' : `Show Changelog Details (${r.changelog.length})`}
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="overflow-hidden"
+                          >
+                            <ul className="list-disc pl-4 mt-3 space-y-1.5 text-xs text-zinc-400 border-l border-zinc-800 ml-1 py-1">
+                              {r.changelog.map((item, idx) => (
+                                <li key={idx} className="leading-relaxed hover:text-zinc-200 transition-colors">{item}</li>
+                              ))}
+                            </ul>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
 };

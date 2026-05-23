@@ -6,7 +6,7 @@
     "seed": "npm run seed --prefix 21stcskillstechiesschools"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^4.7.0",
-    "vite": "^6.4.2"
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.14"
   }
 }

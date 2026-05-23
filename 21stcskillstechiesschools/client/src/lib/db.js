@@ -74,7 +74,7 @@ const dashboardStats = {
       ]
     },
     activities: [
-      { name: 'System Update', action: 'v2.4.1 deployed successfully', time: '10m ago', tag: 'now', avatar: '↑', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
+      { name: 'System Update', action: 'v2.5.0 deployed successfully', time: '10m ago', tag: 'now', avatar: '↑', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
       { name: 'New Hub', action: 'Hub-BLR-04 initialized', time: '2h ago', tag: 'recent', avatar: '+', avatarBg: 'bg-blue-500/20', avatarColor: 'text-blue-400' },
       { name: 'Security Alert', action: 'Failed login spikes (blocked)', time: '5h ago', tag: 'older', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' }
     ]

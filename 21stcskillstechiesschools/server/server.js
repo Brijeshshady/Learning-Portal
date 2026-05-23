@@ -128,10 +128,23 @@ async function seedDatabase() {
                 description: 'This update rolls out the interactive Coding Playground and security hardening for user management.',
                 channel: 'stable',
                 targetHubs: [],
+                status: 'applied',
+                scheduledAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+                appliedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+                createdBy: 'Super Admin',
+                changelog: ['Added interactive student coding playground', 'Secured user query endpoints', 'Fixed CSV export functionality']
+            },
+            {
+                id: 'RL-SAMPLE-02',
+                version: 'v2.6.0',
+                title: 'v2.6.0 Advanced AI & Multi-Model Integration',
+                description: 'This update upgrades the core AI engines to Gemini 3.5 Flash and introduces advanced multi-model capabilities.',
+                channel: 'stable',
+                targetHubs: [],
                 status: 'scheduled',
                 scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
                 createdBy: 'Super Admin',
-                changelog: ['Added interactive student coding playground', 'Secured user query endpoints', 'Fixed CSV export functionality']
+                changelog: ['Upgraded AI model to Gemini 3.5 Flash', 'Added key rotation telemetry dashboards', 'Optimized database index lookups']
             }
         ];
         for (const r of rollouts) {
@@ -426,7 +439,7 @@ app.get('/api/dashboard/stats', protect, async (req, res) => {
                 ]
             },
             activities: [
-                { name: 'System Update', action: 'v2.4.1 deployed successfully', time: '10m ago', tag: 'now', avatar: '↑', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
+                { name: 'System Update', action: 'v2.5.0 deployed successfully', time: '10m ago', tag: 'now', avatar: '↑', avatarBg: 'bg-emerald-500/20', avatarColor: 'text-emerald-400' },
                 { name: 'New Hub', action: 'Hub-BLR-04 initialized', time: '2h ago', tag: 'recent', avatar: '+', avatarBg: 'bg-blue-500/20', avatarColor: 'text-blue-400' },
                 { name: 'Security Alert', action: 'Failed login spikes (blocked)', time: '5h ago', tag: 'older', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' }
             ]

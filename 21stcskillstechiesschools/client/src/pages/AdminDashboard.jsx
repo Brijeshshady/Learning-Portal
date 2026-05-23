@@ -1177,35 +1177,117 @@ const HubRegistryView = () => {
 };
 
 /* ── Analytics View ──────────────────────────────────────── */
-const analyticsArea = [
-  { name: 'Jan', value: 62 }, { name: 'Feb', value: 70 }, { name: 'Mar', value: 68 },
-  { name: 'Apr', value: 75 }, { name: 'May', value: 80 }, { name: 'Jun', value: 83 },
-];
-const hubBar = [
-  { name: 'CH-01', pct: 78 }, { name: 'CBE-02', pct: 82 }, { name: 'MDU-03', pct: 45 },
-];
-const AnalyticsView = () => (
-  <div>
-    <div className="flex items-end justify-between mb-6">
-      <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Platform Analytics</h2><p className="text-zinc-500 text-sm mt-1">Engagement and outcomes across all hubs.</p></div>
-      <button className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all"><Download className="w-3.5 h-3.5" /> Export</button>
+const HUB_ANALYTICS_DATA = {
+  'HUB-CH-01':  { enrolled: 2845, completion: '78%', activeToday: 641, certs: 198, area: [{name:'Jan',value:60},{name:'Feb',value:65},{name:'Mar',value:70},{name:'Apr',value:72},{name:'May',value:78},{name:'Jun',value:80}], atRisk: [{ name: 'Grade 8 — Debugging Logic', action: 'Only 12% completion', time: 'Critical', tag: 'warning', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' }] },
+  'HUB-CBE-02': { enrolled: 1240, completion: '82%', activeToday: 421, certs: 112, area: [{name:'Jan',value:68},{name:'Feb',value:72},{name:'Mar',value:75},{name:'Apr',value:80},{name:'May',value:82},{name:'Jun',value:84}], atRisk: [{ name: 'Grade 9 — Advanced IoT', action: '23% completion', time: 'Warning', tag: 'warning', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' }] },
+};
+const GLOBAL_ANALYTICS = {
+  enrolled: 4085, completion: '80%', activeToday: 1247, certs: 342,
+  area: [{name:'Jan',value:62},{name:'Feb',value:70},{name:'Mar',value:68},{name:'Apr',value:75},{name:'May',value:80},{name:'Jun',value:83}],
+  hubBar: [{name:'CH-01',pct:78},{name:'CBE-02',pct:82},{name:'MDU-03',pct:45}],
+  atRisk: [
+    { name: 'Grade 8 — Debugging Logic', action: 'HUB-CH-01 • Only 12% completion', time: 'Critical', tag: 'warning', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' },
+    { name: 'Grade 9 — Advanced IoT',    action: 'HUB-CBE-02 • 23% completion',     time: 'Warning',  tag: 'warning', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
+  ]
+};
+
+const AnalyticsView = ({ selectedHub }) => {
+  const { hubs } = useStore();
+  const isAll = !selectedHub || selectedHub === 'ALL';
+  const hubData = isAll ? GLOBAL_ANALYTICS : (HUB_ANALYTICS_DATA[selectedHub] || GLOBAL_ANALYTICS);
+  const hubName = !isAll ? (hubs.find(h => h.id === selectedHub)?.name || selectedHub) : null;
+
+  return (
+    <div>
+      <div className="flex items-end justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Platform Analytics</h2>
+          {isAll
+            ? <p className="text-zinc-500 text-sm mt-1">Engagement and outcomes across all hubs. Select a hub to drill down.</p>
+            : <p className="text-sm mt-1"><span className="text-primary font-black">{hubName}</span> <span className="text-zinc-500">· Hub-specific engagement metrics.</span></p>
+          }
+        </div>
+        <button className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all"><Download className="w-3.5 h-3.5" /> Export</button>
+      </div>
+
+      {isAll ? (
+        /* ── ALL HUBS: Show per-hub cards grid ── */
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+            {hubs.map(hub => {
+              const d = HUB_ANALYTICS_DATA[hub.id] || { enrolled: 0, completion: '0%', activeToday: 0, certs: 0 };
+              return (
+                <motion.div
+                  key={hub.id}
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 space-y-4 hover:border-primary/20 transition-all cursor-default"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{hub.id}</p>
+                      <p className="text-sm font-black text-white mt-0.5 leading-tight">{hub.name}</p>
+                      <p className="text-[9px] text-zinc-600 mt-0.5">{hub.location}</p>
+                    </div>
+                    <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">Active</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-900">
+                    <div>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold">Enrolled</p>
+                      <p className="text-lg font-black text-white">{d.enrolled.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold">Completion</p>
+                      <p className="text-lg font-black text-emerald-400">{d.completion}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold">Active Today</p>
+                      <p className="text-lg font-black text-white">{d.activeToday}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold">Certs</p>
+                      <p className="text-lg font-black text-primary">{d.certs}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+          <KpiGrid>
+            <KpiCard label="Total Enrolled"  value="4,085" change="+12%"  icon={Users}       iconBg="bg-primary/15"    iconColor="text-primary"    delay={0} />
+            <KpiCard label="Avg Completion"  value="80%"   change="+5.3%" icon={BarChart3}   iconBg="bg-emerald-500/15" iconColor="text-emerald-400" delay={0.05} />
+            <KpiCard label="Active Today"    value="1,247" change="+8.2%" icon={Activity}    iconBg="bg-secondary/15"  iconColor="text-secondary"  delay={0.1} />
+            <KpiCard label="Certifications"  value="342"   change="+21%"  icon={ShieldCheck} iconBg="bg-amber-500/15"  iconColor="text-amber-400"  delay={0.15} />
+          </KpiGrid>
+          <ChartRow>
+            <AreaChartCard title="Platform Completion Trend" subtitle="Monthly average across all hubs" data={GLOBAL_ANALYTICS.area} dataKey="value" color="#3b82f6" />
+            <BarChartCard  title="Hub Performance Ranking"   subtitle="Completion % per hub"             data={GLOBAL_ANALYTICS.hubBar} dataKey="pct"   color="#7c3aed" />
+          </ChartRow>
+          <ActivityFeed title="At-Risk Alerts (Platform)" subtitle="Grades and hubs that need attention" items={GLOBAL_ANALYTICS.atRisk} />
+        </>
+      ) : (
+        /* ── SPECIFIC HUB ── */
+        <>
+          <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-2xl flex items-center gap-3">
+            <Database className="w-4 h-4 text-primary shrink-0" />
+            <p className="text-xs font-bold text-zinc-300">Showing analytics for <span className="text-primary font-black">{hubName}</span> ({selectedHub}) only. Switch to <span className="text-zinc-400 font-bold">All Hubs</span> to see platform-wide view.</p>
+          </div>
+          <KpiGrid>
+            <KpiCard label="Enrolled"       value={hubData.enrolled.toLocaleString()} change="+6%"   icon={Users}       iconBg="bg-primary/15"    iconColor="text-primary"    delay={0} />
+            <KpiCard label="Completion"     value={hubData.completion}                 change="+3%"   icon={BarChart3}   iconBg="bg-emerald-500/15" iconColor="text-emerald-400" delay={0.05} />
+            <KpiCard label="Active Today"   value={hubData.activeToday.toLocaleString()} change="+5%" icon={Activity}    iconBg="bg-secondary/15"  iconColor="text-secondary"  delay={0.1} />
+            <KpiCard label="Certifications" value={hubData.certs}                       change="+12%"  icon={ShieldCheck} iconBg="bg-amber-500/15"  iconColor="text-amber-400"  delay={0.15} />
+          </KpiGrid>
+          <ChartRow>
+            <AreaChartCard title={`${hubName} Completion Trend`} subtitle="Monthly average for this hub" data={hubData.area} dataKey="value" color="#3b82f6" />
+            <BarChartCard  title="At-Risk Grade Overview"          subtitle="Completion % by grade"        data={[{name:'G7',pct:85},{name:'G8',pct:52},{name:'G9',pct:71}]} dataKey="pct" color="#7c3aed" />
+          </ChartRow>
+          <ActivityFeed title="At-Risk Alerts" subtitle={`Issues flagged within ${hubName}`} items={hubData.atRisk || []} />
+        </>
+      )}
     </div>
-    <KpiGrid>
-      <KpiCard label="Total Enrolled"  value="4,085" change="+12%"  icon={Users}    iconBg="bg-primary/15"   iconColor="text-primary"   delay={0} />
-      <KpiCard label="Avg Completion"  value="80%"   change="+5.3%" icon={BarChart3} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" delay={0.05} />
-      <KpiCard label="Active Today"    value="1,247" change="+8.2%" icon={Activity} iconBg="bg-secondary/15" iconColor="text-secondary"  delay={0.1} />
-      <KpiCard label="Certifications"  value="342"   change="+21%"  icon={ShieldCheck} iconBg="bg-amber-500/15" iconColor="text-amber-400" delay={0.15} />
-    </KpiGrid>
-    <ChartRow>
-      <AreaChartCard title="Completion Rate Trend" subtitle="Monthly average across all hubs" data={analyticsArea} dataKey="value" color="#3b82f6" />
-      <BarChartCard  title="Hub Performance"       subtitle="Completion % per hub"           data={hubBar}        dataKey="pct"   color="#7c3aed" />
-    </ChartRow>
-    <ActivityFeed title="At-Risk Alerts" subtitle="Grades and hubs that need attention" items={[
-      { name: 'Grade 8 — Debugging Logic', action: 'HUB-CH-01 • Only 12% completion', time: 'Critical', tag: 'warning', avatar: '!', avatarBg: 'bg-red-500/20', avatarColor: 'text-red-400' },
-      { name: 'Grade 9 — Advanced IoT',    action: 'HUB-CBE-02 • 23% completion',     time: 'Warning',  tag: 'warning', avatar: '!', avatarBg: 'bg-amber-500/20', avatarColor: 'text-amber-400' },
-    ]} />
-  </div>
-);
+  );
+};
 
 /* ── License View ────────────────────────────────────────── */
 const LicenseView = () => {
@@ -1359,36 +1441,110 @@ const CertificatesView = () => {
 };
 
 /* ── System Attendance ───────────────────────────────────── */
-const SchoolAttendanceView = () => {
-  const { users, attendance = [], teacherAttendance = [], leaves = [] } = useStore();
+const SchoolAttendanceView = ({ selectedHub }) => {
+  const { users, attendance = [], teacherAttendance = [], leaves = [], hubs } = useStore();
   const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0]);
-  const [activeTab, setActiveTab] = React.useState('students'); // 'students', 'teachers', 'leaves'
+  const [activeTab, setActiveTab] = React.useState('students');
 
-  const students = users.filter(u => u.role === 'student');
-  const teachers = users.filter(u => u.role === 'teacher');
-  
+  const isAll = !selectedHub || selectedHub === 'ALL';
+  const hubName = !isAll ? (hubs?.find(h => h.id === selectedHub)?.name || selectedHub) : null;
+
+  // Hub-filtered data
+  const allStudents = users.filter(u => u.role === 'student');
+  const allTeachers = users.filter(u => u.role === 'teacher');
+  const students = isAll ? allStudents : allStudents.filter(u => u.schoolId === selectedHub);
+  const teachers = isAll ? allTeachers : allTeachers.filter(u => u.schoolId === selectedHub);
+
   const currentRecords = attendance.filter(a => a.date === selectedDate);
   const currentTeacherRecords = teacherAttendance.filter(a => a.date === selectedDate);
-  
+
   const leaveRequests = leaves.filter(l => l.status === 'pending');
+
+  // Hub overview stats when ALL is selected
+  const hubAttendanceSummary = isAll ? (hubs || []).map(hub => {
+    const hubStudents = allStudents.filter(u => u.schoolId === hub.id);
+    const presentCount = currentRecords.filter(r => hubStudents.some(s => s.id === r.studentId) && r.status === 'present').length;
+    const total = hubStudents.length;
+    return { hub, total, present: presentCount, pct: total ? Math.round((presentCount / total) * 100) : 0 };
+  }) : [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between">
         <div>
           <h2 className="text-2xl font-black font-headline tracking-tighter text-white">System Attendance</h2>
-          <p className="text-zinc-500 text-sm mt-1">Platform-wide attendance monitoring across all hubs.</p>
+          {isAll
+            ? <p className="text-zinc-500 text-sm mt-1">Platform-wide attendance monitoring. Select a hub to view hub-specific logs.</p>
+            : <p className="text-sm mt-1"><span className="text-primary font-black">{hubName}</span> <span className="text-zinc-500">· Attendance logs for this hub only.</span></p>
+          }
         </div>
         <div className="relative">
           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-          <input 
-            type="date" 
-            value={selectedDate} 
+          <input
+            type="date"
+            value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-blue-500/50"
           />
         </div>
       </div>
+
+      {/* When ALL hubs selected — show hub-wise summary grid */}
+      {isAll && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {hubAttendanceSummary.map(({ hub, total, present, pct }) => (
+            <motion.div
+              key={hub.id}
+              whileHover={{ y: -3, scale: 1.01 }}
+              transition={{ duration: 0.2 }}
+              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-primary/20 transition-all"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{hub.id}</p>
+                  <p className="text-sm font-black text-white mt-0.5 leading-tight">{hub.name}</p>
+                  <p className="text-[9px] text-zinc-600 mt-0.5">{hub.location}</p>
+                </div>
+                <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border ${
+                  pct >= 80 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                            : pct >= 50 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                            : 'text-red-400 bg-red-500/10 border-red-500/20'
+                }`}>{pct}%</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center mb-3">
+                <div className="bg-zinc-900/50 rounded-xl p-2">
+                  <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold mb-0.5">Present</p>
+                  <p className="text-lg font-black text-emerald-400">{present}</p>
+                </div>
+                <div className="bg-zinc-900/50 rounded-xl p-2">
+                  <p className="text-[8px] text-zinc-500 uppercase tracking-wider font-bold mb-0.5">Total</p>
+                  <p className="text-lg font-black text-white">{total}</p>
+                </div>
+              </div>
+              <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className={`h-full rounded-full ${
+                    pct >= 80 ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : pct >= 50 ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                              : 'bg-gradient-to-r from-red-500 to-rose-400'
+                  }`}
+                />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* When specific hub selected — show banner */}
+      {!isAll && (
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl flex items-center gap-3">
+          <Database className="w-4 h-4 text-primary shrink-0" />
+          <p className="text-xs font-bold text-zinc-300">Showing attendance data for <span className="text-primary font-black">{hubName}</span> ({selectedHub}) only. Switch to <span className="text-zinc-400 font-bold">All Hubs</span> to see the platform overview.</p>
+        </div>
+      )}
 
       <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl w-fit border border-zinc-800">
         {[
@@ -1416,7 +1572,7 @@ const SchoolAttendanceView = () => {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {students.length === 0 ? (
-                <tr><td colSpan="4" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No students available.</td></tr>
+                <tr><td colSpan="4" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No students {isAll ? '' : `in ${hubName}`}.</td></tr>
               ) : (
                 students.map((s) => {
                   const record = currentRecords.find(a => a.studentId === s.id);
@@ -1450,31 +1606,36 @@ const SchoolAttendanceView = () => {
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
           <table className="w-full text-left">
             <thead className="border-b border-zinc-800">
-              <tr>{['Teacher', 'Check-In', 'Check-Out', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+              <tr>{['Teacher', 'Hub', 'Check-In', 'Check-Out', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {teachers.map((t) => {
-                const record = currentTeacherRecords.find(a => a.teacherId === t.id);
-                return (
-                  <tr key={t.id} className="hover:bg-white/[0.01]">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">{t.name[0]}</div>
-                        <p className="text-sm font-bold text-white">{t.name}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkIn || '--:--'}</td>
-                    <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkOut || '--:--'}</td>
-                    <td className="px-6 py-4">
-                      {record ? (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">On Duty</span>
-                      ) : (
-                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Off Duty</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {teachers.length === 0 ? (
+                <tr><td colSpan="5" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No teachers {isAll ? '' : `in ${hubName}`}.</td></tr>
+              ) : (
+                teachers.map((t) => {
+                  const record = currentTeacherRecords.find(a => a.teacherId === t.id);
+                  return (
+                    <tr key={t.id} className="hover:bg-white/[0.01]">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 font-black text-xs">{t.name[0]}</div>
+                          <p className="text-sm font-bold text-white">{t.name}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold text-zinc-500">{t.schoolId || '—'}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkIn || '--:--'}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-white">{record?.checkOut || '--:--'}</td>
+                      <td className="px-6 py-4">
+                        {record ? (
+                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md">On Duty</span>
+                        ) : (
+                          <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-800 border border-zinc-700 px-2.5 py-1 rounded-md">Off Duty</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -1484,17 +1645,18 @@ const SchoolAttendanceView = () => {
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
           <table className="w-full text-left">
             <thead className="border-b border-zinc-800">
-              <tr>{['Student', 'Dates', 'Reason', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
+              <tr>{['Student', 'Hub', 'Dates', 'Reason', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {leaves.length === 0 ? (
-                <tr><td colSpan="4" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No leave applications.</td></tr>
+                <tr><td colSpan="5" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No leave applications.</td></tr>
               ) : (
                 leaves.map((l) => (
                   <tr key={l.id} className="hover:bg-white/[0.01]">
                     <td className="px-6 py-4">
                       <p className="text-sm font-bold text-white">{l.studentName || 'Student'}</p>
                     </td>
+                    <td className="px-6 py-4 text-xs font-bold text-zinc-500">{l.hubId || l.schoolId || '—'}</td>
                     <td className="px-6 py-4 text-xs font-bold text-white">{l.startDate} to {l.endDate}</td>
                     <td className="px-6 py-4 text-xs text-zinc-500 italic max-w-xs truncate">{l.reason}</td>
                     <td className="px-6 py-4">
@@ -1893,6 +2055,155 @@ const RolloutManagerView = () => {
   );
 };
 
+/* ── Community View (Admin: Hub-wise) ───────────────────── */
+const TAG_COLORS = {
+  Announcement: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  Discussion:   'text-purple-400 bg-purple-500/10 border-purple-500/20',
+  Platform:     'text-primary bg-primary/10 border-primary/20',
+  Showcase:     'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  Event:        'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+};
+const ROLE_COLORS = {
+  admin: 'text-primary bg-primary/10',
+  'school-admin': 'text-emerald-400 bg-emerald-500/10',
+  teacher: 'text-amber-400 bg-amber-500/10',
+  student: 'text-zinc-400 bg-zinc-800',
+};
+
+const CommunityView = ({ selectedHub }) => {
+  const { posts, hubs } = useStore();
+  const [searchQ, setSearchQ] = React.useState('');
+  const [tagFilter, setTagFilter] = React.useState('ALL');
+
+  const isAll = !selectedHub || selectedHub === 'ALL';
+  const hubName = !isAll ? (hubs?.find(h => h.id === selectedHub)?.name || selectedHub) : null;
+
+  // Since store posts don't have schoolId, we simulate hub-wise by author role/tag.
+  // In a real system posts would carry schoolId; for now show all posts with hub banner.
+  const filteredPosts = posts.filter(p => {
+    const matchTag = tagFilter === 'ALL' || p.tag === tagFilter;
+    const matchSearch = !searchQ || p.body.toLowerCase().includes(searchQ.toLowerCase()) || p.author.toLowerCase().includes(searchQ.toLowerCase());
+    return matchTag && matchSearch;
+  });
+
+  const allTags = ['ALL', ...new Set(posts.map(p => p.tag))];
+
+  // Hub-wise post counts (simulated)
+  const HUB_POST_COUNTS = { 'HUB-CH-01': 3, 'HUB-CBE-02': 2 };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white flex items-center gap-2">
+            Community Hub
+          </h2>
+          {isAll
+            ? <p className="text-zinc-500 text-sm mt-1">Platform-wide discussions, announcements, and showcases. Select a hub to filter.</p>
+            : <p className="text-sm mt-1"><span className="text-primary font-black">{hubName}</span> <span className="text-zinc-500">· Community posts from this hub.</span></p>
+          }
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+              placeholder="Search posts..."
+              className="bg-zinc-800 border border-zinc-700 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-primary/50 placeholder:text-zinc-600 w-48"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Hub overview when ALL is selected */}
+      {isAll && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {(hubs || []).map(hub => (
+            <motion.div
+              key={hub.id}
+              whileHover={{ y: -3, scale: 1.01 }}
+              transition={{ duration: 0.2 }}
+              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-primary/20 transition-all"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{hub.id}</p>
+                  <p className="text-sm font-black text-white mt-0.5 leading-tight">{hub.name}</p>
+                </div>
+                <span className="text-[9px] font-black uppercase px-2 py-1 rounded-full border text-primary bg-primary/10 border-primary/20">
+                  {HUB_POST_COUNTS[hub.id] || 0} posts
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-500">{hub.location} · Community active</p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Tag filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {allTags.map(tag => (
+          <button
+            key={tag}
+            onClick={() => setTagFilter(tag)}
+            className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+              tagFilter === tag
+                ? 'bg-primary border-primary text-white'
+                : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-white hover:border-zinc-600'
+            }`}
+          >
+            {tag}
+          </button>
+        ))}
+      </div>
+
+      {!isAll && (
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl flex items-center gap-3">
+          <Database className="w-4 h-4 text-primary shrink-0" />
+          <p className="text-xs font-bold text-zinc-300">Showing posts from <span className="text-primary font-black">{hubName}</span>. Switch to <span className="text-zinc-400 font-bold">All Hubs</span> to see platform-wide activity.</p>
+        </div>
+      )}
+
+      {/* Posts Feed */}
+      <div className="space-y-4">
+        {filteredPosts.length === 0 ? (
+          <div className="text-center py-16 text-zinc-600 font-bold text-xs">No posts match the current filter.</div>
+        ) : (
+          filteredPosts.map(post => (
+            <motion.div
+              key={post.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-zinc-700/60 transition-all"
+            >
+              <div className="flex items-start gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${ROLE_COLORS[post.role] || 'text-zinc-400 bg-zinc-800'}`}>
+                  {post.avatar}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-2 flex-wrap">
+                    <span className="text-sm font-black text-white">{post.author}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${ROLE_COLORS[post.role] || 'text-zinc-400 bg-zinc-800 border-zinc-700'}`}>{post.role}</span>
+                    <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${TAG_COLORS[post.tag] || 'text-zinc-400 bg-zinc-800 border-zinc-700'}`}>{post.tag}</span>
+                    <span className="text-[9px] text-zinc-600 font-bold ml-auto">{post.time}</span>
+                  </div>
+                  <p className="text-sm text-zinc-300 leading-relaxed">{post.body}</p>
+                  <div className="flex items-center gap-4 mt-3">
+                    <span className="text-[10px] font-bold text-zinc-600">❤ {post.likes} likes</span>
+                    <span className="text-[10px] font-bold text-zinc-600">💬 {post.comments} comments</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
 /* ── Bug Tracker View ────────────────────────────────────── */
 const BugTrackerView = () => {
   const [bugs, setBugs] = React.useState([]);
@@ -2109,17 +2420,18 @@ const AdminDashboard = () => {
   }, []);
 
   const views = {
-    dashboard:    <DashboardView stats={stats} onNavigate={(v) => setSearchParams({ v })} />,
-    users:        <UsersView />,
-    schools:      <HubRegistryView />,
-    certificates: <CertificatesView />,
-    activation:   <LicenseView />,
-    attendance:   <SchoolAttendanceView />,
-    analytics:    <AnalyticsView />,
-    'exam-analytics': <ExamAnalytics />,
-    system:       <SystemMonitorView stats={stats} />,
-    rollouts:     <RolloutManagerView />,
-    bugs:         <BugTrackerView />,
+    dashboard:        <DashboardView stats={stats} onNavigate={(v) => setSearchParams({ v })} />,
+    users:            <UsersView />,
+    schools:          <HubRegistryView />,
+    certificates:     <CertificatesView />,
+    activation:       <LicenseView />,
+    attendance:       <SchoolAttendanceView selectedHub={selectedHub} />,
+    analytics:        <AnalyticsView selectedHub={selectedHub} />,
+    'exam-analytics': <ExamAnalytics selectedHub={selectedHub} />,
+    community:        <CommunityView selectedHub={selectedHub} />,
+    system:           <SystemMonitorView stats={stats} />,
+    rollouts:         <RolloutManagerView />,
+    bugs:             <BugTrackerView />,
   };
 
   return (

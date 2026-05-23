@@ -8,9 +8,9 @@ const getAIResponse = async (userMessage, userContext, apiKey, forceFallback = f
 
         const genAI = new GoogleGenerativeAI(apiKey);
         
-        // Use Gemini 3.1 Flash Lite as requested
+        // Use Gemini 3.5 Flash as requested
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-3.1-flash-lite",
+            model: "gemini-3.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
             }
@@ -476,7 +476,7 @@ const executeCodeAI = async (code, language, action, apiKey, forceFallback = fal
 
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-3.1-flash-lite",
+            model: "gemini-3.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
             }
