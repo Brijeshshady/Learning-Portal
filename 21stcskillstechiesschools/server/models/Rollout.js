@@ -7,7 +7,7 @@ const rolloutSchema = new mongoose.Schema({
     description: { type: String, default: '' },
     channel:     { type: String, enum: ['beta', 'stable'], default: 'stable' },
     targetHubs:  [{ type: String }],
-    status:      { type: String, enum: ['pending', 'scheduled', 'applied', 'rolled-back'], default: 'pending' },
+    status:      { type: String, enum: ['pending', 'scheduled', 'applied', 'rolled-back', 'cancelled'], default: 'pending' },
     scheduledAt: { type: Date },
     appliedAt:   { type: Date },
     createdBy:   { type: String },

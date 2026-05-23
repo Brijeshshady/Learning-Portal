@@ -15,7 +15,7 @@ exports.createExam = async (req, res) => {
             id,
             gradeId,
             createdBy: req.user.id,
-            schoolId: req.user.schoolId || 'HUB-CH-01'
+            schoolId: req.user.schoolId || req.body.schoolId || 'HUB-CH-01'
         });
         res.status(201).json(exam);
     } catch (err) {
@@ -34,6 +34,8 @@ exports.getExams = async (req, res) => {
             // Teacher/School Admin/Super Admin
             if (req.user.schoolId) {
                 filter.schoolId = req.user.schoolId;
+            } else if (req.query.schoolId) {
+                filter.schoolId = req.query.schoolId;
             }
             // For teachers, we could filter by grades, but let's let them see all exams of the school.
         }
@@ -48,6 +50,19 @@ exports.getExamById = async (req, res) => {
     try {
         const exam = await Exam.findOne({ id: req.params.id });
         if (!exam) return res.status(404).json({ error: "Exam not found" });
+        
+        // Data boundary validation
+        if (req.user.role === 'student') {
+            if (exam.schoolId !== req.user.schoolId || exam.gradeId !== req.user.grade || exam.status !== 'published') {
+                return res.status(403).json({ error: "Unauthorized to access this exam" });
+            }
+        } else if (req.user.role !== 'admin') {
+            // Teacher/School Admin must belong to the same school
+            if (exam.schoolId !== req.user.schoolId) {
+                return res.status(403).json({ error: "Unauthorized to access this exam" });
+            }
+        }
+        
         res.json(exam);
     } catch (err) {
         res.status(500).json({ error: err.message });

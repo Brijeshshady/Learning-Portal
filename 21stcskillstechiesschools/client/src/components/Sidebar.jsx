@@ -52,7 +52,6 @@ const MENUS = {
       { name: 'System Monitor', view: 'system',    icon: Cpu },
       { name: 'Rollouts',       view: 'rollouts',  icon: Rocket },
       { name: 'Bug Tracker',   view: 'bugs',      icon: Bug },
-      { name: 'Submit Bug',     view: 'submit-bug', icon: Bug },
       { name: 'Community',     view: 'community', icon: MessageSquare },
     ],
   },

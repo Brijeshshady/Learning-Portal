@@ -780,7 +780,11 @@ const HubRegistryView = () => {
     storageLimit: 10,
     playgroundEnabled: true,
     certificateLimit: 200,
-    communityAccess: true
+    communityAccess: true,
+    maxTeachers: 15,
+    dailyAiLimit: 200,
+    maxExamAttempts: 3,
+    sandboxTimeout: 5
   };
 
   const [formData, setFormData] = React.useState({ 
@@ -817,6 +821,10 @@ const HubRegistryView = () => {
       playgroundEnabled: hub.featureLimits?.playgroundEnabled ?? true,
       certificateLimit: hub.featureLimits?.certificateLimit ?? 200,
       communityAccess: hub.featureLimits?.communityAccess ?? true,
+      maxTeachers: hub.featureLimits?.maxTeachers ?? 15,
+      dailyAiLimit: hub.featureLimits?.dailyAiLimit ?? 200,
+      maxExamAttempts: hub.featureLimits?.maxExamAttempts ?? 3,
+      sandboxTimeout: hub.featureLimits?.sandboxTimeout ?? 5,
       mActive: hub.maintenance?.active || false,
       mUntil: hub.maintenance?.until || '',
       mMessage: hub.maintenance?.message || ''
@@ -851,7 +859,11 @@ const HubRegistryView = () => {
         storageLimit: Number(formData.storageLimit),
         playgroundEnabled: formData.playgroundEnabled,
         certificateLimit: Number(formData.certificateLimit),
-        communityAccess: formData.communityAccess
+        communityAccess: formData.communityAccess,
+        maxTeachers: Number(formData.maxTeachers),
+        dailyAiLimit: Number(formData.dailyAiLimit),
+        maxExamAttempts: Number(formData.maxExamAttempts),
+        sandboxTimeout: Number(formData.sandboxTimeout)
       }
     };
 
@@ -958,6 +970,25 @@ const HubRegistryView = () => {
               <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
                 <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Storage</p>
                 <p className="text-xs font-bold text-white mt-0.5">{hub.featureLimits?.storageLimit || 10} GB</p>
+              </div>
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Teachers</p>
+                <p className="text-xs font-bold text-white mt-0.5">Max {hub.featureLimits?.maxTeachers || 15}</p>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Daily AI Limit</p>
+                <p className="text-xs font-bold text-white mt-0.5">{hub.featureLimits?.dailyAiLimit || 200}/d</p>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Attempts</p>
+                <p className="text-xs font-bold text-white mt-0.5">Max {hub.featureLimits?.maxExamAttempts || 3}</p>
+              </div>
+              <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-2.5">
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-wider">Sandbox TO</p>
+                <p className="text-xs font-bold text-white mt-0.5">{hub.featureLimits?.sandboxTimeout || 5}s</p>
               </div>
             </div>
             
@@ -1094,6 +1125,49 @@ const HubRegistryView = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Max Teachers</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.maxTeachers} 
+                  onChange={(e) => setFormData({...formData, maxTeachers: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Daily AI Limit</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.dailyAiLimit} 
+                  onChange={(e) => setFormData({...formData, dailyAiLimit: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Max Attempts</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.maxExamAttempts} 
+                  onChange={(e) => setFormData({...formData, maxExamAttempts: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Sandbox TO (s)</label>
+                <input 
+                  required 
+                  type="number" 
+                  value={formData.sandboxTimeout} 
+                  onChange={(e) => setFormData({...formData, sandboxTimeout: e.target.value})} 
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-primary/50" 
+                />
+              </div>
+            </div>
+
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-zinc-800/40 rounded-xl border border-zinc-800">
                 <div>
@@ -1191,7 +1265,7 @@ const GLOBAL_ANALYTICS = {
   ]
 };
 
-const AnalyticsView = ({ selectedHub }) => {
+const AnalyticsView = ({ selectedHub, onSelectHub }) => {
   const { hubs } = useStore();
   const isAll = !selectedHub || selectedHub === 'ALL';
   const hubData = isAll ? GLOBAL_ANALYTICS : (HUB_ANALYTICS_DATA[selectedHub] || GLOBAL_ANALYTICS);
@@ -1221,7 +1295,8 @@ const AnalyticsView = ({ selectedHub }) => {
                   key={hub.id}
                   whileHover={{ y: -4, scale: 1.01 }}
                   transition={{ duration: 0.2 }}
-                  className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 space-y-4 hover:border-primary/20 transition-all cursor-default"
+                  onClick={() => onSelectHub(hub.id)}
+                  className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 space-y-4 hover:border-primary/20 transition-all cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -1441,7 +1516,7 @@ const CertificatesView = () => {
 };
 
 /* ── System Attendance ───────────────────────────────────── */
-const SchoolAttendanceView = ({ selectedHub }) => {
+const SchoolAttendanceView = ({ selectedHub, onSelectHub }) => {
   const { users, attendance = [], teacherAttendance = [], leaves = [], hubs } = useStore();
   const [selectedDate, setSelectedDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = React.useState('students');
@@ -1458,7 +1533,8 @@ const SchoolAttendanceView = ({ selectedHub }) => {
   const currentRecords = attendance.filter(a => a.date === selectedDate);
   const currentTeacherRecords = teacherAttendance.filter(a => a.date === selectedDate);
 
-  const leaveRequests = leaves.filter(l => l.status === 'pending');
+  const filteredLeaves = isAll ? leaves : leaves.filter(l => (l.hubId || l.schoolId) === selectedHub);
+  const leaveRequests = filteredLeaves.filter(l => l.status === 'pending');
 
   // Hub overview stats when ALL is selected
   const hubAttendanceSummary = isAll ? (hubs || []).map(hub => {
@@ -1497,7 +1573,8 @@ const SchoolAttendanceView = ({ selectedHub }) => {
               key={hub.id}
               whileHover={{ y: -3, scale: 1.01 }}
               transition={{ duration: 0.2 }}
-              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-primary/20 transition-all"
+              onClick={() => onSelectHub(hub.id)}
+              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-primary/20 transition-all cursor-pointer"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -1648,10 +1725,10 @@ const SchoolAttendanceView = ({ selectedHub }) => {
               <tr>{['Student', 'Hub', 'Dates', 'Reason', 'Status'].map((h) => <th key={h} className="px-6 py-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-600">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {leaves.length === 0 ? (
-                <tr><td colSpan="5" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No leave applications.</td></tr>
+              {filteredLeaves.length === 0 ? (
+                <tr><td colSpan="5" className="px-6 py-16 text-center text-zinc-600 font-bold text-xs">No leave applications {isAll ? '' : `in ${hubName}`}.</td></tr>
               ) : (
-                leaves.map((l) => (
+                filteredLeaves.map((l) => (
                   <tr key={l.id} className="hover:bg-white/[0.01]">
                     <td className="px-6 py-4">
                       <p className="text-sm font-bold text-white">{l.studentName || 'Student'}</p>
@@ -1969,6 +2046,8 @@ const RolloutManagerView = () => {
                               ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
                               : r.status === 'rolled-back'
                               ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                              : r.status === 'cancelled'
+                              ? 'text-zinc-500 bg-zinc-800/40 border-zinc-700/50'
                               : 'text-zinc-400 bg-zinc-800 border-zinc-700'
                           }`}>
                             {r.status}
@@ -2003,9 +2082,9 @@ const RolloutManagerView = () => {
                               Rollback
                             </button>
                           )}
-                          {r.status === 'scheduled' && (
+                           {r.status === 'scheduled' && (
                             <button 
-                              onClick={() => handleUpdateStatus(r.id, 'pending')}
+                              onClick={() => handleUpdateStatus(r.id, 'cancelled')}
                               className="text-[9px] font-black text-zinc-500 hover:text-white bg-zinc-800 border border-zinc-700 px-2.5 py-1.5 rounded-lg uppercase tracking-wider transition-colors"
                             >
                               Cancel
@@ -2070,26 +2149,30 @@ const ROLE_COLORS = {
   student: 'text-zinc-400 bg-zinc-800',
 };
 
-const CommunityView = ({ selectedHub }) => {
-  const { posts, hubs } = useStore();
+const CommunityView = ({ selectedHub, onSelectHub }) => {
+  const { posts = [], hubs = [] } = useStore();
   const [searchQ, setSearchQ] = React.useState('');
   const [tagFilter, setTagFilter] = React.useState('ALL');
 
   const isAll = !selectedHub || selectedHub === 'ALL';
   const hubName = !isAll ? (hubs?.find(h => h.id === selectedHub)?.name || selectedHub) : null;
 
-  // Since store posts don't have schoolId, we simulate hub-wise by author role/tag.
-  // In a real system posts would carry schoolId; for now show all posts with hub banner.
   const filteredPosts = posts.filter(p => {
+    const matchHub = isAll || p.schoolId === selectedHub || !p.schoolId;
     const matchTag = tagFilter === 'ALL' || p.tag === tagFilter;
     const matchSearch = !searchQ || p.body.toLowerCase().includes(searchQ.toLowerCase()) || p.author.toLowerCase().includes(searchQ.toLowerCase());
-    return matchTag && matchSearch;
+    return matchHub && matchTag && matchSearch;
   });
 
   const allTags = ['ALL', ...new Set(posts.map(p => p.tag))];
 
-  // Hub-wise post counts (simulated)
-  const HUB_POST_COUNTS = { 'HUB-CH-01': 3, 'HUB-CBE-02': 2 };
+  // Hub-wise post counts dynamically calculated
+  const HUB_POST_COUNTS = posts.reduce((acc, p) => {
+    if (p.schoolId) {
+      acc[p.schoolId] = (acc[p.schoolId] || 0) + 1;
+    }
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -2122,9 +2205,10 @@ const CommunityView = ({ selectedHub }) => {
           {(hubs || []).map(hub => (
             <motion.div
               key={hub.id}
+              onClick={() => onSelectHub && onSelectHub(hub.id)}
               whileHover={{ y: -3, scale: 1.01 }}
               transition={{ duration: 0.2 }}
-              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-primary/20 transition-all"
+              className="bg-zinc-950/40 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-5 hover:border-primary/20 transition-all cursor-pointer"
             >
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -2419,19 +2503,35 @@ const AdminDashboard = () => {
     fetchStats();
   }, []);
 
-  const views = {
-    dashboard:        <DashboardView stats={stats} onNavigate={(v) => setSearchParams({ v })} />,
-    users:            <UsersView />,
-    schools:          <HubRegistryView />,
-    certificates:     <CertificatesView />,
-    activation:       <LicenseView />,
-    attendance:       <SchoolAttendanceView selectedHub={selectedHub} />,
-    analytics:        <AnalyticsView selectedHub={selectedHub} />,
-    'exam-analytics': <ExamAnalytics selectedHub={selectedHub} />,
-    community:        <CommunityView selectedHub={selectedHub} />,
-    system:           <SystemMonitorView stats={stats} />,
-    rollouts:         <RolloutManagerView />,
-    bugs:             <BugTrackerView />,
+  const renderActiveView = () => {
+    switch (activeView) {
+      case 'dashboard':
+        return <DashboardView stats={stats} onNavigate={(v) => setSearchParams({ v })} />;
+      case 'users':
+        return <UsersView />;
+      case 'schools':
+        return <HubRegistryView />;
+      case 'certificates':
+        return <CertificatesView />;
+      case 'activation':
+        return <LicenseView />;
+      case 'attendance':
+        return <SchoolAttendanceView selectedHub={selectedHub} onSelectHub={setSelectedHub} />;
+      case 'analytics':
+        return <AnalyticsView selectedHub={selectedHub} onSelectHub={setSelectedHub} />;
+      case 'exam-analytics':
+        return <ExamAnalytics selectedHub={selectedHub} />;
+      case 'community':
+        return <CommunityView selectedHub={selectedHub} onSelectHub={setSelectedHub} />;
+      case 'system':
+        return <SystemMonitorView stats={stats} />;
+      case 'rollouts':
+        return <RolloutManagerView />;
+      case 'bugs':
+        return <BugTrackerView />;
+      default:
+        return <DashboardView stats={stats} onNavigate={(v) => setSearchParams({ v })} />;
+    }
   };
 
   return (
@@ -2464,7 +2564,7 @@ const AdminDashboard = () => {
 
       <AnimatePresence mode="wait">
         <motion.div key={activeView} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-          {views[activeView] || views.dashboard}
+          {renderActiveView()}
         </motion.div>
       </AnimatePresence>
     </div>

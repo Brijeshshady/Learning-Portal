@@ -21,6 +21,13 @@ app.use(express.json());
 const PORT = process.env.PORT || 8102;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/21stc_portal';
 const JWT_SECRET = process.env.JWT_SECRET || '21stc_super_secret_key_2024';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET environment variable is required in production mode!');
+}
+
+const escapeRegex = (string) => {
+    return string ? string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') : '';
+};
 
 // ── MIDDLEWARE ──────────────────────────────────────────────────────────────
 
@@ -65,8 +72,44 @@ async function seedDatabase() {
         console.log("Syncing demo data with security...");
         
         const schools = [
-            { id: 'HUB-CH-01', name: '21stc Chennai Hub', plan: 'Enterprise', studentLimit: 5000, aiLimit: 20000, status: 'active' },
-            { id: 'HUB-CBE-02', name: '21stc Coimbatore Hub', plan: 'Pro', studentLimit: 2000, aiLimit: 10000, status: 'active' }
+            { 
+                id: 'HUB-CH-01', 
+                name: '21stc Chennai Hub', 
+                plan: 'Enterprise', 
+                studentLimit: 5000, 
+                aiLimit: 20000, 
+                status: 'active',
+                featureLimits: {
+                    examLimit: 50,
+                    storageLimit: 10,
+                    playgroundEnabled: true,
+                    certificateLimit: 200,
+                    communityAccess: true,
+                    maxTeachers: 15,
+                    dailyAiLimit: 200,
+                    maxExamAttempts: 3,
+                    sandboxTimeout: 5
+                }
+            },
+            { 
+                id: 'HUB-CBE-02', 
+                name: '21stc Coimbatore Hub', 
+                plan: 'Pro', 
+                studentLimit: 2000, 
+                aiLimit: 10000, 
+                status: 'active',
+                featureLimits: {
+                    examLimit: 50,
+                    storageLimit: 10,
+                    playgroundEnabled: true,
+                    certificateLimit: 200,
+                    communityAccess: true,
+                    maxTeachers: 15,
+                    dailyAiLimit: 200,
+                    maxExamAttempts: 3,
+                    sandboxTimeout: 5
+                }
+            }
         ];
         for (const s of schools) {
             await School.findOneAndUpdate({ id: s.id }, s, { upsert: true });
@@ -91,7 +134,6 @@ async function seedDatabase() {
                 exists.name = u.name;
                 exists.role = u.role;
                 exists.schoolId = u.schoolId;
-                exists.password = u.password; // Trigger re-hash via pre-save hook
                 if (u.grades) exists.grades = u.grades;
                 if (u.grade) exists.grade = u.grade;
                 await exists.save();
@@ -163,7 +205,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         // Case-insensitive exact match
-        const user = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') } });
         
         if (user && (await user.matchPassword(password))) {
             const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
@@ -189,7 +231,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { name, email, password, role, schoolId, grade } = req.body;
-        const exists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        const exists = await User.findOne({ email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') } });
         if (exists) {
             return res.status(400).json({ error: 'A user with this email already exists' });
         }
@@ -263,7 +305,7 @@ app.get('/api/users/by-email/:email', protect, async (req, res) => {
 app.post('/api/users', protect, authorize('admin', 'school-admin'), async (req, res) => {
     try {
         const { name, email, password, role, schoolId, grade, status } = req.body;
-        const exists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        const exists = await User.findOne({ email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') } });
         if (exists) {
             return res.status(400).json({ error: 'A user with this email already exists' });
         }
@@ -328,7 +370,7 @@ app.put('/api/users/:id', protect, async (req, res) => {
         
         if (name) user.name = name;
         if (email && email.toLowerCase() !== user.email.toLowerCase()) {
-            const emailExists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+            const emailExists = await User.findOne({ email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') } });
             if (emailExists) {
                 return res.status(400).json({ error: 'A user with this email already exists' });
             }
@@ -370,7 +412,17 @@ app.delete('/api/users/:id', protect, authorize('admin', 'school-admin'), async 
 });
 app.get('/api/dashboard/stats', protect, async (req, res) => {
     try {
-        const { role, id } = req.query;
+        let role = req.user.role;
+        if (req.user.role === 'admin' && req.query.role) {
+            role = req.query.role;
+        }
+        let id = req.query.id;
+        if (req.user.role === 'school-admin') {
+            id = req.user.schoolId;
+        } else if (req.user.role === 'student') {
+            id = req.user.id;
+        }
+
         
         // Base dashboard stats structures (mirrors client-side db.js stats template)
         const studentStats = {
@@ -553,6 +605,22 @@ app.post('/api/certificates', protect, async (req, res) => {
     }
 });
 
+app.delete('/api/certificates/:id', protect, authorize('admin', 'school-admin', 'teacher'), async (req, res) => {
+    try {
+        const cert = await Certificate.findOne({ id: req.params.id });
+        if (!cert) return res.status(404).json({ error: 'Certificate not found' });
+        
+        if (req.user.role !== 'admin' && cert.schoolId !== req.user.schoolId) {
+            return res.status(403).json({ error: 'Unauthorized to delete this certificate' });
+        }
+        
+        await Certificate.deleteOne({ id: req.params.id });
+        res.json({ success: true, message: 'Certificate deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/schools', protect, async (req, res) => {
     try {
         const schools = await School.find();
@@ -616,7 +684,7 @@ app.put('/api/users/profile', protect, async (req, res) => {
         
         if (name) user.name = name;
         if (email && email.toLowerCase() !== user.email.toLowerCase()) {
-            const exists = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+            const exists = await User.findOne({ email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') } });
             if (exists) {
                 return res.status(400).json({ error: 'A user with this email already exists' });
             }

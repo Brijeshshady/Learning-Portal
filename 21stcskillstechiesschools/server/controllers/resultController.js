@@ -172,13 +172,24 @@ exports.saveManualEvaluation = async (req, res) => {
         const percentage = maxPossibleScore > 0 ? Number(((totalScore / maxPossibleScore) * 100).toFixed(2)) : 0;
         
         // Update/create Result record
+        const resultId = `RES-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
         const result = await Result.findOneAndUpdate(
             { examId: attempt.examId, studentId: attempt.studentId },
             {
-                marksObtained: totalScore,
-                totalMarks: maxPossibleScore,
-                percentage,
-                remarks: `Manual grading completed by ${req.user.name}.`
+                $set: {
+                    marksObtained: totalScore,
+                    totalMarks: maxPossibleScore,
+                    percentage,
+                    remarks: `Manual grading completed by ${req.user.name}.`
+                },
+                $setOnInsert: {
+                    id: resultId,
+                    examId: attempt.examId,
+                    studentId: attempt.studentId,
+                    strengths: ["Robotics Basics"],
+                    weakAreas: ["Complex Conditions"],
+                    topicWiseAnalysis: []
+                }
             },
             { upsert: true, new: true }
         );
@@ -195,6 +206,8 @@ exports.getGlobalAnalytics = async (req, res) => {
         const filter = {};
         if (req.user.role === 'school-admin') {
             filter.schoolId = req.user.schoolId;
+        } else if (req.user.role === 'admin' && req.query.schoolId) {
+            filter.schoolId = req.query.schoolId;
         }
         
         const exams = await Exam.find(filter);

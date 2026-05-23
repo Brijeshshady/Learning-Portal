@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     schoolId: { type: String },
     grades: [{ type: Number }], // For teachers
     grade: { type: Number },    // For students
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     createdAt: { type: Date, default: Date.now }
 });
 

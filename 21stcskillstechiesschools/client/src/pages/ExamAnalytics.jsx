@@ -44,9 +44,10 @@ const ExamAnalytics = ({ user, selectedHub }) => {
 
   const fetchData = async () => {
     try {
+      const hubFilter = selectedHub && selectedHub !== 'ALL' ? selectedHub : null;
       const [analyticsData, examsData, schoolsData] = await Promise.all([
-        DB.getExamAnalytics(),
-        DB.getExams(),
+        DB.getExamAnalytics(hubFilter),
+        DB.getExams(hubFilter),
         DB.getSchools()
       ]);
       setAnalytics(analyticsData);

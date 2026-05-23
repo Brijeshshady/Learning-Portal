@@ -132,16 +132,14 @@ exports.runCodingTests = async (code, testCases) => {
                 error: result.error || null
             });
         } catch (e) {
-            // Regex match local check fallback in case of key limits
-            const isLocalPass = code.includes(tc.expectedOutput); 
+            // Mark as failed when AI pipeline is offline (no insecure substring matching fallback)
             feedback.push({
                 testCaseIndex: i,
-                passed: isLocalPass,
-                actualOutput: isLocalPass ? tc.expectedOutput : 'Local compilation error',
+                passed: false,
+                actualOutput: 'AI evaluation offline',
                 expectedOutput: tc.expectedOutput,
-                error: isLocalPass ? null : e.message
+                error: 'AI coding evaluation service is currently offline. Marked for manual review.'
             });
-            if (isLocalPass) passed++;
         }
     }
     

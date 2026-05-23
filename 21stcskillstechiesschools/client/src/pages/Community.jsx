@@ -53,7 +53,10 @@ const Community = () => {
   const [showCompose, setShowCompose] = useState(false);
 
   const tags = ['all', 'Announcement', 'Discussion', 'Showcase', 'Event'];
-  const filtered = filter === 'all' ? posts : posts.filter(p => p.tag === filter);
+  const userHubPosts = user?.role === 'admin'
+    ? posts
+    : posts.filter(p => !p.schoolId || p.schoolId === user?.schoolId);
+  const filtered = filter === 'all' ? userHubPosts : userHubPosts.filter(p => p.tag === filter);
 
   const handlePost = () => {
     if (!newPost.trim()) return;
@@ -63,6 +66,7 @@ const Community = () => {
       avatar: (user?.name || 'A')[0],
       body: newPost,
       tag: 'Discussion',
+      schoolId: user?.schoolId || null,
     });
     setNewPost('');
     setShowCompose(false);

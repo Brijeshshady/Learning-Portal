@@ -1,4 +1,4 @@
-import { getState, addUser, addCertificate } from './store';
+import { getState, addUser, addCertificate, removeCertificate } from './store';
 
 const API_BASE = '/api'; 
 
@@ -311,8 +311,7 @@ const DB = {
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     
-    const idx = demoCertificates.findIndex(c => c.id === certId);
-    if (idx !== -1) demoCertificates.splice(idx, 1);
+    removeCertificate(certId);
     return { success: true };
   },
 
@@ -324,9 +323,10 @@ const DB = {
   },
 
   // ─── EXAMS API ─────────────────────────────────────────────────────────────
-  getExams: async () => {
+  getExams: async (schoolId) => {
     try {
-      const res = await fetch(`${API_BASE}/exams`, { headers: getAuthHeaders() });
+      const url = schoolId ? `${API_BASE}/exams?schoolId=${encodeURIComponent(schoolId)}` : `${API_BASE}/exams`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     return [];
@@ -466,9 +466,10 @@ const DB = {
     return await res.json();
   },
 
-  getExamAnalytics: async () => {
+  getExamAnalytics: async (schoolId) => {
     try {
-      const res = await fetch(`${API_BASE}/results/analytics`, { headers: getAuthHeaders() });
+      const url = schoolId ? `${API_BASE}/results/analytics?schoolId=${encodeURIComponent(schoolId)}` : `${API_BASE}/results/analytics`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) return await res.json();
     } catch { /* fall through */ }
     return null;

@@ -18,12 +18,12 @@ const authorize = (...roles) => {
 
 router.post('/', authorize('admin', 'school-admin', 'teacher'), validateExamPayload, examController.createExam);
 router.get('/', examController.getExams);
-router.get('/:id', examController.getExamById);
 router.post('/questions', authorize('admin', 'school-admin', 'teacher'), examController.addQuestions);
 router.post('/generate-ai', authorize('admin', 'school-admin', 'teacher'), examController.aiGenerateQuestions);
 router.post('/attempts/start', examController.startAttempt);
 router.get('/attempts/:examId', examController.getAttempt);
 router.post('/attempts/save', examController.autoSaveAttempt);
+router.get('/:id', examController.getExamById);
 router.put('/:examId/publish', authorize('admin', 'school-admin', 'teacher'), examController.publishExam);
 router.delete('/:examId', authorize('admin', 'school-admin', 'teacher'), examController.deleteExam);
 

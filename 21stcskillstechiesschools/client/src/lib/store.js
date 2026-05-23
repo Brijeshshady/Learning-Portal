@@ -37,11 +37,11 @@ const initialNotifications = [
 ];
 
 const initialPosts = [
-  { id: 1, author: 'Ms. Kavitha',      role: 'teacher',       avatar: 'K', time: '10m ago',   likes: 24, comments: 8,  tag: 'Announcement', body: 'Week 7 Neural Logic module is now live! Complete the theory section before Friday. 🚀', liked: false },
-  { id: 2, author: 'Arun Kumar',        role: 'student',       avatar: 'A', time: '1h ago',    likes: 11, comments: 5,  tag: 'Discussion',    body: 'Has anyone tried connecting NodeMCU to a custom API? I got CORS errors. #IoT', liked: false },
-  { id: 3, author: 'Super Admin',       role: 'admin',         avatar: 'S', time: '3h ago',    likes: 47, comments: 12, tag: 'Platform',      body: 'New: the 36-week roadmap now shows your predicted completion date. Check your dashboard! 🎯', liked: false },
-  { id: 4, author: 'Priya Selvi',       role: 'student',       avatar: 'P', time: 'Yesterday', likes: 9,  comments: 3,  tag: 'Showcase',      body: 'Finished my Smart Room Controller — controls lights, fan, and door via voice! 🏆', liked: false },
-  { id: 5, author: 'Chennai Hub Admin', role: 'school-admin',  avatar: 'C', time: '2d ago',    likes: 31, comments: 7,  tag: 'Event',         body: 'Robotics Showcase is on May 25th! Grade 7 & 8 register by May 20. 🤖', liked: false },
+  { id: 1, author: 'Ms. Kavitha',      role: 'teacher',       avatar: 'K', time: '10m ago',   likes: 24, comments: 8,  tag: 'Announcement', body: 'Week 7 Neural Logic module is now live! Complete the theory section before Friday. 🚀', liked: false, schoolId: 'HUB-CH-01' },
+  { id: 2, author: 'Arun Kumar',        role: 'student',       avatar: 'A', time: '1h ago',    likes: 11, comments: 5,  tag: 'Discussion',    body: 'Has anyone tried connecting NodeMCU to a custom API? I got CORS errors. #IoT', liked: false, schoolId: 'HUB-CH-01' },
+  { id: 3, author: 'Super Admin',       role: 'admin',         avatar: 'S', time: '3h ago',    likes: 47, comments: 12, tag: 'Platform',      body: 'New: the 36-week roadmap now shows your predicted completion date. Check your dashboard! 🎯', liked: false, schoolId: null },
+  { id: 4, author: 'Priya Selvi',       role: 'student',       avatar: 'P', time: 'Yesterday', likes: 9,  comments: 3,  tag: 'Showcase',      body: 'Finished my Smart Room Controller — controls lights, fan, and door via voice! 🏆', liked: false, schoolId: 'HUB-CBE-02' },
+  { id: 5, author: 'Chennai Hub Admin', role: 'school-admin',  avatar: 'C', time: '2d ago',    likes: 31, comments: 7,  tag: 'Event',         body: 'Robotics Showcase is on May 25th! Grade 7 & 8 register by May 20. 🤖', liked: false, schoolId: 'HUB-CH-01' },
 ];
 
 const initialHubs = [
@@ -51,7 +51,18 @@ const initialHubs = [
     studentLimit: 3000, 
     location: 'Chennai',    
     completion: '78%',
-    maintenance: { active: false, until: null, message: '' }
+    maintenance: { active: false, until: null, message: '' },
+    featureLimits: {
+      examLimit: 50,
+      storageLimit: 10,
+      playgroundEnabled: true,
+      certificateLimit: 200,
+      communityAccess: true,
+      maxTeachers: 15,
+      dailyAiLimit: 200,
+      maxExamAttempts: 3,
+      sandboxTimeout: 5
+    }
   },
   { 
     id: 'HUB-CBE-02', 
@@ -59,7 +70,18 @@ const initialHubs = [
     studentLimit: 1500, 
     location: 'Coimbatore', 
     completion: '82%',
-    maintenance: { active: false, until: null, message: '' }
+    maintenance: { active: false, until: null, message: '' },
+    featureLimits: {
+      examLimit: 50,
+      storageLimit: 10,
+      playgroundEnabled: true,
+      certificateLimit: 200,
+      communityAccess: true,
+      maxTeachers: 15,
+      dailyAiLimit: 200,
+      maxExamAttempts: 3,
+      sandboxTimeout: 5
+    }
   },
 ];
 
@@ -339,8 +361,8 @@ export const markRead = (id) => {
 };
 
 // ── Posts ──
-export const addPost = ({ author, role, avatar, body, tag }) => {
-  const post = { id: Date.now(), author, role, avatar, body, tag, time: 'Just now', likes: 0, comments: 0, liked: false };
+export const addPost = ({ author, role, avatar, body, tag, schoolId }) => {
+  const post = { id: Date.now(), author, role, avatar, body, tag, schoolId, time: 'Just now', likes: 0, comments: 0, liked: false };
   state = { ...state, posts: [post, ...state.posts] };
   notify();
   return post;
@@ -604,6 +626,11 @@ export const addCertificate = (cert) => {
   state = { ...state, certificates: [cert, ...state.certificates] };
   notify();
   return cert;
+};
+
+export const removeCertificate = (id) => {
+  state = { ...state, certificates: state.certificates.filter((c) => c.id !== id) };
+  notify();
 };
 
 // ── Maintenance Mode ──

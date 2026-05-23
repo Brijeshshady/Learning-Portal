@@ -1,6 +1,8 @@
 const Result = require('../models/Result');
 const ExamAttempt = require('../models/ExamAttempt');
 const Question = require('../models/Question');
+const Exam = require('../models/Exam');
+const User = require('../models/User');
 const examService = require('./examService');
 const aiManager = require('./aiManager');
 
@@ -11,6 +13,12 @@ exports.evaluateAttempt = async (attemptId) => {
     try {
         const attempt = await ExamAttempt.findOne({ id: attemptId });
         if (!attempt) return console.error(`[RESULT SERVICE] Attempt ${attemptId} not found`);
+        
+        const exam = await Exam.findOne({ id: attempt.examId });
+        const subject = exam ? exam.subject : 'General';
+        
+        const student = await User.findOne({ id: attempt.studentId });
+        const studentGrade = student ? student.grade : 7;
         
         const questions = await Question.find({ examId: attempt.examId });
         const questionsMap = new Map(questions.map(q => [q.id, q]));
@@ -25,7 +33,7 @@ exports.evaluateAttempt = async (attemptId) => {
             if (!q) continue;
             
             maxPossibleScore += q.marks;
-            const subject = q.subject || 'General';
+            // Use exam's subject as the topic category
             if (!topicCounts[subject]) {
                 topicCounts[subject] = { correct: 0, total: q.marks };
             } else {
@@ -93,7 +101,7 @@ exports.evaluateAttempt = async (attemptId) => {
                     const aiRes = await aiManager.getBalancedResponse(aiPrompt, {
                         name: "Descriptive Grader Core",
                         role: "teacher",
-                        grade: 7
+                        grade: studentGrade
                     });
                     
                     let rawText = aiRes.text || aiRes;
@@ -150,7 +158,7 @@ exports.evaluateAttempt = async (attemptId) => {
                 const q = questionsMap.get(a.questionId);
                 return {
                     question: q?.question,
-                    topic: q?.subject,
+                    topic: subject,
                     maxMarks: q?.marks,
                     scoreAwarded: a.score,
                     isCorrect: a.isCorrect
@@ -170,7 +178,7 @@ exports.evaluateAttempt = async (attemptId) => {
             const aiAnalysis = await aiManager.getBalancedResponse(analysisPrompt, {
                 name: "Insights Builder Core",
                 role: "teacher",
-                grade: 7
+                grade: studentGrade
             });
             
             let rawText = aiAnalysis.text || aiAnalysis;
