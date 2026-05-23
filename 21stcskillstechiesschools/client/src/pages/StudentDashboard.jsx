@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Cpu, Bot, Rocket, HelpCircle, Lock, ExternalLink, ChevronRight, MessageSquare, Award, Download, Database, BookOpen, CheckCircle2, AlertTriangle, Plus, FileText, X, Clock, Inbox, ThumbsUp, ThumbsDown, Calendar, Trophy, Users } from 'lucide-react';
+import { Zap, Cpu, Bot, Rocket, HelpCircle, Lock, ExternalLink, ChevronRight, MessageSquare, Award, Download, Database, BookOpen, CheckCircle2, AlertTriangle, Plus, FileText, X, Clock, Inbox, ThumbsUp, ThumbsDown, Calendar, Trophy, Users, Paperclip, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -289,41 +289,117 @@ const AILabView = () => {
 const ProjectsView = ({ user }) => {
   const { submissions, grades } = useStore();
   const [submitProject, setSubmitProject] = useState(null);
+  const [viewProjectDetails, setViewProjectDetails] = useState(null);
   const [projectLink, setProjectLink] = useState('');
   const [projectNotes, setProjectNotes] = useState('');
+  const [projectAttachment, setProjectAttachment] = useState(null);
+  const [fileError, setFileError] = useState('');
+  const fileInputRef = useRef(null);
 
-  const handleOpenSubmit = (p) => {
+  const handleOpenSubmit = (p, existingSub = null) => {
     setSubmitProject(p);
-    setProjectLink('');
-    setProjectNotes('');
+    setFileError('');
+    if (existingSub) {
+      const linkMatch = existingSub.content?.match(/Link:\s*(.*)/);
+      const notesMatch = existingSub.content?.match(/Notes:\s*([\s\S]*)/);
+      setProjectLink(linkMatch && linkMatch[1] !== 'None' ? linkMatch[1] : '');
+      setProjectNotes(notesMatch ? notesMatch[1] : '');
+      setProjectAttachment(existingSub.attachment || null);
+    } else {
+      setProjectLink('');
+      setProjectNotes('');
+      setProjectAttachment(null);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setFileError('File exceeds 2MB size limit.');
+      return;
+    }
+    setFileError('');
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProjectAttachment({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        data: reader.result
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!submitProject) return;
 
+    if (!projectLink && !projectAttachment) {
+      setFileError('Please provide either a project link or attach a file.');
+      return;
+    }
+
     submitAssignment({
       studentId: user.id,
       studentName: user.name,
+      schoolId: user.schoolId,
       week: submitProject.week,
       title: submitProject.title,
-      content: `Link: ${projectLink}\nNotes: ${projectNotes}`
+      content: `Link: ${projectLink || 'None'}\nNotes: ${projectNotes}`,
+      attachment: projectAttachment
     });
     addNotification({ title: 'Project Submitted', body: `${submitProject.title} has been submitted for grading!`, type: 'success' });
     setSubmitProject(null);
   };
 
+  const handleViewAttachment = (attachment) => {
+    if (!attachment || !attachment.data) return;
+    try {
+      const parts = attachment.data.split(',');
+      const byteString = atob(parts[1]);
+      const mimeString = parts[0].split(':')[1].split(';')[0];
+      
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([ab], { type: mimeString });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    } catch (e) {
+      console.error(e);
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(`<iframe src="${attachment.data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+      }
+    }
+  };
+
   const getStatus = (p) => {
     const sub = submissions.find(s => s.studentId === user.id && s.title === p.title);
-    if (!sub) return 'pending_submission';
-    const grade = grades[sub.id];
-    if (grade) return { status: 'graded', grade };
-    return { status: 'under_review' };
+    if (!sub) return { status: 'pending_submission' };
+    if (sub.status === 'graded') {
+      return { status: 'graded', grade: grades[sub.id] || 'A', feedback: sub.feedback, submission: sub };
+    }
+    if (sub.status === 'needs_revision') {
+      return { status: 'needs_revision', feedback: sub.feedback, submission: sub };
+    }
+    return { status: 'under_review', submission: sub };
   };
 
   return (
     <div className="space-y-6">
-      <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Projects</h2><p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have built.</p></div>
+      <div>
+        <h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Projects</h2>
+        <p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have built.</p>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           { title: 'Smart Room Controller', week: 3, type: 'IoT', borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400' },
@@ -332,29 +408,64 @@ const ProjectsView = ({ user }) => {
         ].map((p) => {
           const info = getStatus(p);
           return (
-            <SectionCard key={p.title} className={`border ${p.borderClass}`}>
-              <div className="flex items-start justify-between mb-3">
-                <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
-                {info.status === 'graded' ? (
-                  <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {info.grade}</span>
-                ) : info.status === 'under_review' ? (
-                  <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">Under Review</span>
-                ) : (
-                  <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">In Progress</span>
+            <SectionCard key={p.title} className={`border flex flex-col justify-between ${p.borderClass}`}>
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
+                  {info.status === 'graded' ? (
+                    <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {info.grade}</span>
+                  ) : info.status === 'needs_revision' ? (
+                    <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">Revision Required</span>
+                  ) : info.status === 'under_review' ? (
+                    <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">Under Review</span>
+                  ) : (
+                    <span className="text-[9px] font-black text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-1 rounded-lg">In Progress</span>
+                  )}
+                </div>
+                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
+                <h3 className="text-base font-black text-white mb-2 leading-tight">{p.title}</h3>
+                
+                {/* Inline feedback if revision requested */}
+                {info.status === 'needs_revision' && (
+                  <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-400 mb-1">Teacher Feedback</p>
+                    <p className="text-zinc-300 italic font-medium leading-relaxed">"{info.feedback || 'Please revise and resubmit your implementation.'}"</p>
+                  </div>
+                )}
+                
+                {/* Inline grade feedback if available */}
+                {info.status === 'graded' && info.feedback && (
+                  <div className="mb-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 text-xs">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">Teacher Comments</p>
+                    <p className="text-zinc-400 font-medium leading-relaxed">"{info.feedback}"</p>
+                  </div>
                 )}
               </div>
-              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
-              <h3 className="text-base font-black text-white mb-4">{p.title}</h3>
               
-              {info.status !== 'pending_submission' ? (
-                <button className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2`}>
-                  <ExternalLink className="w-3.5 h-3.5" /> View Project
-                </button>
-              ) : (
-                <button onClick={() => handleOpenSubmit(p)} className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2`}>
-                  <Award className="w-3.5 h-3.5" /> Submit Project
-                </button>
-              )}
+              <div className="mt-4">
+                {info.status === 'needs_revision' ? (
+                  <button 
+                    onClick={() => handleOpenSubmit(p, info.submission)} 
+                    className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-500 text-black hover:bg-amber-400 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  >
+                    <Award className="w-3.5 h-3.5" /> Revise & Resubmit
+                  </button>
+                ) : info.status === 'graded' || info.status === 'under_review' ? (
+                  <button 
+                    onClick={() => setViewProjectDetails(info.submission)}
+                    className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary/50`}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> View Submission
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleOpenSubmit(p)} 
+                    className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                  >
+                    <Award className="w-3.5 h-3.5" /> Submit Project
+                  </button>
+                )}
+              </div>
             </SectionCard>
           );
         })}
@@ -366,27 +477,181 @@ const ProjectsView = ({ user }) => {
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Link (GitHub, Drive, etc.)</label>
             <input 
-              required 
               type="url" 
               value={projectLink} 
               onChange={(e) => setProjectLink(e.target.value)} 
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-secondary/50" 
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-650 focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-transparent outline-none" 
               placeholder="https://github.com/..." 
             />
           </div>
+          
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">File Attachment (Max 2MB)</label>
+            {!projectAttachment ? (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-zinc-700 hover:border-secondary/50 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer bg-zinc-900/40 hover:bg-zinc-900/60 transition-all group"
+              >
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  className="hidden" 
+                />
+                <Paperclip className="w-6 h-6 text-zinc-500 group-hover:text-secondary transition-colors" />
+                <p className="text-xs font-bold text-zinc-400">Click to upload file</p>
+                <p className="text-[10px] text-zinc-600 font-medium">PDF, ZIP, PNG, JPG up to 2MB</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-850/80 border border-zinc-700 rounded-xl p-3.5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-secondary/15 flex items-center justify-center text-secondary">
+                    <Paperclip className="w-4 h-4" />
+                  </div>
+                  <div className="max-w-[200px] sm:max-w-[250px]">
+                    <p className="text-xs font-bold text-white truncate">{projectAttachment.name}</p>
+                    <p className="text-[10px] text-zinc-555 font-bold">{(projectAttachment.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setProjectAttachment(null)}
+                  className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/20 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            {fileError && (
+              <p className="text-[11px] text-red-400 font-bold mt-1.5 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {fileError}
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Additional Notes</label>
             <textarea 
               value={projectNotes} 
               onChange={(e) => setProjectNotes(e.target.value)} 
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-secondary/50 h-24 resize-none" 
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-secondary/50 focus:border-transparent outline-none h-24 resize-none" 
               placeholder="Any comments for the instructor?" 
             />
           </div>
-          <button type="submit" className="w-full bg-secondary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)]">
+          <button type="submit" className="w-full bg-secondary text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] focus:outline-none focus:ring-2 focus:ring-secondary/50">
             Submit for Grading
           </button>
         </form>
+      </Modal>
+
+      {/* View Project Details Modal */}
+      <Modal isOpen={!!viewProjectDetails} onClose={() => setViewProjectDetails(null)} title={`Submission Details: ${viewProjectDetails?.title}`}>
+        <div className="space-y-5">
+          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Submitted Time</p>
+              <p className="text-xs font-bold text-white mt-0.5">{viewProjectDetails?.submittedAt}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 text-right">Status</p>
+              <div className="mt-0.5 text-right">
+                {viewProjectDetails?.status === 'graded' ? (
+                  <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg uppercase">Graded</span>
+                ) : (
+                  <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg uppercase">Under Review</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {(() => {
+            const linkMatch = viewProjectDetails?.content?.match(/Link:\s*(.*)/);
+            const notesMatch = viewProjectDetails?.content?.match(/Notes:\s*([\s\S]*)/);
+            return (
+              <div className="space-y-4">
+                {linkMatch && linkMatch[1] && linkMatch[1] !== 'None' && (
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project URL</span>
+                    <a 
+                      href={linkMatch[1]} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-400 hover:text-blue-300 hover:underline bg-blue-500/5 border border-blue-500/10 px-3.5 py-2 rounded-xl transition-all"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Go to project link
+                    </a>
+                  </div>
+                )}
+                
+                {notesMatch && notesMatch[1] && (
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Your Submission Notes</span>
+                    <div className="text-sm text-zinc-300 leading-relaxed bg-zinc-900 border border-zinc-800 p-3.5 rounded-xl whitespace-pre-wrap">{notesMatch[1]}</div>
+                  </div>
+                )}
+
+                {!linkMatch && !notesMatch && viewProjectDetails?.content && (
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Submission Notes / Content</span>
+                    <div className="text-sm text-zinc-300 leading-relaxed bg-zinc-900 border border-zinc-800 p-3.5 rounded-xl whitespace-pre-wrap">{viewProjectDetails.content}</div>
+                  </div>
+                )}
+
+                {viewProjectDetails?.attachment && (
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Attached File</span>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center text-secondary">
+                          <Paperclip className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white max-w-[200px] sm:max-w-[250px] truncate">{viewProjectDetails.attachment.name}</p>
+                          <p className="text-[9px] text-zinc-500 font-bold">{(viewProjectDetails.attachment.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button 
+                          type="button"
+                          onClick={() => handleViewAttachment(viewProjectDetails.attachment)}
+                          className="h-8 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-600/50"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </button>
+                        <a 
+                          href={viewProjectDetails.attachment.data} 
+                          download={viewProjectDetails.attachment.name}
+                          className="h-8 px-3 rounded-lg bg-secondary text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-650 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {viewProjectDetails?.status === 'graded' && (
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 mt-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Teacher Evaluation</span>
+                <span className="text-xs font-black text-white bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg">Grade: {grades[viewProjectDetails?.id] || 'A'}</span>
+              </div>
+              <p className="text-xs text-zinc-400 font-medium leading-relaxed leading-loose italic">
+                "{viewProjectDetails?.feedback || 'Great work on this implementation!'}"
+              </p>
+            </div>
+          )}
+
+          <button 
+            onClick={() => setViewProjectDetails(null)} 
+            className="w-full bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700 transition-all font-black py-3 rounded-xl text-[10px] uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-zinc-600/50"
+          >
+            Close Details
+          </button>
+        </div>
       </Modal>
     </div>
   );

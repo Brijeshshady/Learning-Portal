@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle, X } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle, X, Paperclip } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -9,7 +9,7 @@ import {
   AreaChartCard, BarChartCard, ActivityFeed, SectionCard,
 } from '../components/DashboardShell';
 import useStore from '../hooks/useStore';
-import { submitGrade, submitAssignment, exportCSV, addNotification, markAttendance, teacherCheckIn, teacherCheckOut, updateLeaveStatus } from '../lib/store';
+import { submitGrade, submitAssignment, exportCSV, addNotification, markAttendance, teacherCheckIn, teacherCheckOut, updateLeaveStatus, requestRevision } from '../lib/store';
 import Modal from '../components/Modal';
 import html2pdf from 'html2pdf.js';
 import CertificateTemplate from '../components/CertificateTemplate';
@@ -18,6 +18,31 @@ import ManageExams from './ManageExams';
 import EvaluateAnswers from './EvaluateAnswers';
 
 
+
+const handleViewAttachment = (attachment) => {
+  if (!attachment || !attachment.data) return;
+  try {
+    const parts = attachment.data.split(',');
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    
+    const blob = new Blob([ab], { type: mimeString });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+  } catch (e) {
+    console.error(e);
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(`<iframe src="${attachment.data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+    }
+  }
+};
 
 /* ── Overview ─────────────────────────────────────────────── */
 const OverviewView = ({ stats }) => {
@@ -293,7 +318,10 @@ const StudentsView = ({ students }) => {
                                 <tr key={sub.id} className="hover:bg-white/[0.01] transition-all">
                                   <td className="px-6 py-4 text-xs font-bold text-zinc-400">Week {sub.week}</td>
                                   <td className="px-6 py-4">
-                                    <p className="text-xs font-black text-white">{sub.title}</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-xs font-black text-white">{sub.title}</p>
+                                      {sub.attachment && <Paperclip className="w-3 h-3 text-blue-400 shrink-0" />}
+                                    </div>
                                     <p className="text-[10px] text-zinc-500 font-bold truncate max-w-xs">{sub.content}</p>
                                   </td>
                                   <td className="px-6 py-4 text-[10px] text-zinc-500 font-bold">{sub.submittedAt}</td>
@@ -403,35 +431,47 @@ const StudentsView = ({ students }) => {
   );
 };
 
-/* ── Submissions ──────────────────────────────────────────── */
 const SubmissionsView = ({ students = [] }) => {
   const [expandedId, setExpandedId] = useState(null);
-  const [activeGrade, setActiveGrade] = useState('');
+  const [activeGrade, setActiveGrade] = useState({});
+  const [feedbackText, setFeedbackText] = useState({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formData, setFormData] = useState({ studentId: '', week: 1, title: '', link: '', notes: '' });
   const { submissions, grades } = useStore();
   const { user } = useAuth();
 
-  // Filter submissions by teacher's school and assigned grades
-  const subs = submissions.filter(s => {
-    // Basic filter: only show submissions from student in the same school
-    // Advanced: could filter by teacher.grades if available
-    return true; // For demo, show all global subs
-  }).map(s => ({
+  const teacherStudentIds = students.map(s => s.id);
+  
+  // Filter submissions by matching student IDs in the teacher's roster
+  const subs = submissions.filter(s => teacherStudentIds.includes(s.studentId)).map(s => ({
     ...s,
     grade: grades[s.id] || null,
-    status: grades[s.id] ? 'graded' : 'pending'
+    status: s.status
   }));
 
+  const pendingSubs = subs.filter(s => s.status === 'pending');
+
   const handleExport = () => {
-    exportCSV(subs.map(s => ({ Student: s.student, Week: s.week, Title: s.title, Grade: s.grade || 'Pending' })), 'grades.csv');
+    exportCSV(subs.map(s => ({ Student: s.studentName, Week: s.week, Title: s.title, Grade: grades[s.id] || 'Pending', Status: s.status })), 'grades.csv');
   };
 
   const handleGradeSubmit = (id) => {
-    if (!activeGrade) return;
-    submitGrade(id, activeGrade);
+    if (!activeGrade[id]) return;
+    submitGrade(id, activeGrade[id], feedbackText[id] || '');
     setExpandedId(null);
-    setActiveGrade('');
+    setActiveGrade(prev => { const n = { ...prev }; delete n[id]; return n; });
+    setFeedbackText(prev => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  const handleRequestRevision = (id) => {
+    if (!feedbackText[id]) {
+      alert('Please provide feedback explaining what needs to be revised.');
+      return;
+    }
+    requestRevision(id, feedbackText[id]);
+    setExpandedId(null);
+    setActiveGrade(prev => { const n = { ...prev }; delete n[id]; return n; });
+    setFeedbackText(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
   const handleCreateSubmit = (e) => {
@@ -442,6 +482,7 @@ const SubmissionsView = ({ students = [] }) => {
     submitAssignment({
       studentId: student.id,
       studentName: student.name,
+      schoolId: student.schoolId,
       week: Number(formData.week),
       title: formData.title,
       content: formData.link || formData.notes ? `Link: ${formData.link}\nNotes: ${formData.notes}` : 'Offline Submission'
@@ -455,50 +496,197 @@ const SubmissionsView = ({ students = [] }) => {
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between">
-        <div><h2 className="text-2xl font-black font-headline tracking-tighter text-white">Submissions & Grading</h2><p className="text-zinc-500 text-sm mt-1">{subs.filter(s => s.status === 'pending').length} awaiting review.</p></div>
+        <div>
+          <h2 className="text-2xl font-black font-headline tracking-tighter text-white">Submissions & Grading</h2>
+          <p className="text-zinc-500 text-sm mt-1">{pendingSubs.length} awaiting review.</p>
+        </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowCreateModal(true)} className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"><PlusCircle className="w-3.5 h-3.5" /> Create</button>
-          <button onClick={handleExport} className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all"><Download className="w-3.5 h-3.5" /> Export</button>
+          <button onClick={() => setShowCreateModal(true)} className="bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"><PlusCircle className="w-3.5 h-3.5" /> Create</button>
+          <button onClick={handleExport} className="bg-zinc-800 border border-zinc-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:border-zinc-600 transition-all focus:outline-none focus:ring-2 focus:ring-zinc-600/50"><Download className="w-3.5 h-3.5" /> Export</button>
         </div>
       </div>
+      
       <div className="space-y-3">
-        {subs.map((s) => (
-          <div key={s.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-            <button onClick={() => setExpandedId(expandedId === s.id ? null : s.id)} className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all">
-              <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 font-black text-xs shrink-0">{s.studentName[0]}</div>
-              <div className="flex-1"><p className="text-sm font-bold text-white">{s.studentName}</p><p className="text-xs text-zinc-500 font-medium">Week {s.week}: {s.title}</p></div>
-              <span className="text-[9px] text-zinc-600 font-black">{s.submittedAt}</span>
-              {s.status === 'pending' ? <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest">Pending</span> : <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest">Grade: {s.grade}</span>}
-              <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${expandedId === s.id ? 'rotate-180' : ''}`} />
-            </button>
-            <AnimatePresence>
-              {expandedId === s.id && (
-                <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-t border-zinc-800">
-                  <div className="p-5 space-y-4">
-                    <div className="bg-zinc-800/60 rounded-xl p-4 text-sm text-zinc-400 min-h-[60px] border border-zinc-700/50">
-                      {s.content}
-                    </div>
-                    {s.status === 'pending' && (
-                      <div className="flex gap-2 flex-wrap items-center">
-                        {['A', 'B+', 'B', 'C+', 'C'].map((g) => (
-                          <button key={g} onClick={() => setActiveGrade(g)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${activeGrade === g ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 border-blue-500' : 'bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 border'}`}>{g}</button>
-                        ))}
-                        <button onClick={() => handleGradeSubmit(s.id)} className={`ml-auto px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeGrade ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-600' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>Submit Grade</button>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+        {subs.length === 0 ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-16 flex flex-col items-center gap-4 text-center">
+            <div className="w-16 h-16 bg-zinc-800 border border-zinc-700 rounded-2xl flex items-center justify-center">
+              <ClipboardList className="w-8 h-8 text-zinc-650" />
+            </div>
+            <p className="text-white font-black text-lg">No submissions yet</p>
+            <p className="text-zinc-500 text-sm">Submissions from your students will appear here.</p>
           </div>
-        ))}
+        ) : (
+          subs.map((s) => (
+            <div key={s.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+              <button 
+                onClick={() => setExpandedId(expandedId === s.id ? null : s.id)} 
+                className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400 font-black text-xs shrink-0">{s.studentName[0]}</div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-white">{s.studentName}</p>
+                  <p className="text-xs text-zinc-500 font-medium">Week {s.week}: {s.title}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[9px] text-zinc-600 font-black shrink-0">{s.submittedAt}</span>
+                  {s.status === 'pending' ? (
+                    <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shrink-0">
+                      <Clock className="w-2.5 h-2.5" /> Pending
+                    </span>
+                  ) : s.status === 'needs_revision' ? (
+                    <span className="text-[9px] font-black text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shrink-0">
+                      <AlertTriangle className="w-2.5 h-2.5" /> Needs Revision
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest shrink-0">
+                      Grade: {s.grade}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-4 h-4 text-zinc-600 transition-transform ${expandedId === s.id ? 'rotate-180' : ''} shrink-0`} />
+                </div>
+              </button>
+              
+              <AnimatePresence>
+                {expandedId === s.id && (
+                  <motion.div 
+                    initial={{ height: 0 }} 
+                    animate={{ height: 'auto' }} 
+                    exit={{ height: 0 }} 
+                    className="overflow-hidden border-t border-zinc-800"
+                  >
+                    <div className="p-5 space-y-4">
+                      {/* Submission details content */}
+                      <div className="bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-4">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Submission Details</p>
+                        {(() => {
+                          const linkMatch = s.content?.match(/Link:\s*(.*)/);
+                          const notesMatch = s.content?.match(/Notes:\s*([\s\S]*)/);
+                          if (linkMatch || notesMatch || s.attachment) {
+                            return (
+                              <div className="space-y-3">
+                                {linkMatch && linkMatch[1] && linkMatch[1] !== 'None' && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-zinc-500 mr-2">Link:</span>
+                                    <a href={linkMatch[1]} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-400 hover:underline">{linkMatch[1]}</a>
+                                  </div>
+                                )}
+                                {notesMatch && notesMatch[1] && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-zinc-500 block mb-1">Notes:</span>
+                                    <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{notesMatch[1]}</p>
+                                  </div>
+                                )}
+                                {s.attachment && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-zinc-500 block mb-1">Attachment:</span>
+                                    <div className="bg-zinc-900/50 border border-zinc-800/80 p-3 rounded-lg flex items-center justify-between">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                                          <Paperclip className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-[300px]">{s.attachment.name}</p>
+                                          <p className="text-[9px] text-zinc-500 font-bold">{(s.attachment.size / 1024).toFixed(1)} KB</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleViewAttachment(s.attachment)}
+                                          className="h-8 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-600/50"
+                                        >
+                                          <Eye className="w-3.5 h-3.5" /> View
+                                        </button>
+                                        <a 
+                                          href={s.attachment.data} 
+                                          download={s.attachment.name}
+                                          className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                        >
+                                          <Download className="w-3.5 h-3.5" /> Download
+                                        </a>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          return <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{s.content || 'No content provided.'}</p>;
+                        })()}
+                      </div>
+
+                      {/* Display active feedback if it exists */}
+                      {s.feedback && (
+                        <div className={`rounded-xl p-3.5 text-xs border ${s.status === 'graded' ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>
+                          <p className="text-[9px] font-black uppercase tracking-widest mb-1">{s.status === 'graded' ? 'Grading Comments' : 'Feedback Sent'}</p>
+                          <p className="text-zinc-300 italic font-medium leading-relaxed">"{s.feedback}"</p>
+                        </div>
+                      )}
+
+                      {/* Evaluation panel (only shown if not graded) */}
+                      {s.status !== 'graded' && (
+                        <div className="space-y-4 pt-2 border-t border-zinc-850">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Assign Grade</p>
+                            <div className="flex gap-2 flex-wrap items-center">
+                              {['A+', 'A', 'B+', 'B', 'C+', 'C', 'D'].map((g) => (
+                                <button 
+                                  key={g} 
+                                  type="button"
+                                  onClick={() => setActiveGrade(prev => ({ ...prev, [s.id]: g }))} 
+                                  className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${activeGrade[s.id] === g ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 border-blue-500' : 'bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 border focus:outline-none focus:ring-2 focus:ring-blue-500/50'}`}
+                                >
+                                  {g}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1">Feedback / Notes</p>
+                            <textarea 
+                              value={feedbackText[s.id] || ''} 
+                              onChange={(e) => setFeedbackText(prev => ({ ...prev, [s.id]: e.target.value }))}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none h-16 resize-none font-medium"
+                              placeholder="Provide details for grading or revision request..."
+                            />
+                          </div>
+
+                          <div className="flex gap-3">
+                            <button 
+                              type="button"
+                              onClick={() => handleGradeSubmit(s.id)} 
+                              disabled={!activeGrade[s.id]}
+                              className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeGrade[s.id] ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20' : 'bg-zinc-800 text-zinc-650 cursor-not-allowed'}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Submit Grade
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => handleRequestRevision(s.id)}
+                              disabled={!feedbackText[s.id]}
+                              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${feedbackText[s.id] ? 'bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500 hover:text-black' : 'bg-zinc-800 text-zinc-650 cursor-not-allowed border border-zinc-700'}`}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" /> Request Revision
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))
+        )}
       </div>
 
+      {/* Record Submission Modal */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Record Submission">
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Student</label>
-            <select required value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50">
+            <select required value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent outline-none">
               <option value="" disabled>Select a student...</option>
               {students.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
             </select>
@@ -506,22 +694,22 @@ const SubmissionsView = ({ students = [] }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Week Number</label>
-              <input required type="number" min="1" max="36" value={formData.week} onChange={(e) => setFormData({...formData, week: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+              <input required type="number" min="1" max="36" value={formData.week} onChange={(e) => setFormData({...formData, week: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent outline-none" />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Title</label>
-              <input required type="text" placeholder="e.g. AI Model" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+              <input required type="text" placeholder="e.g. AI Model" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent outline-none" />
             </div>
           </div>
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Link (Optional)</label>
-            <input type="url" placeholder="https://..." value={formData.link} onChange={(e) => setFormData({...formData, link: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
+            <input type="url" placeholder="https://..." value={formData.link} onChange={(e) => setFormData({...formData, link: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent outline-none" />
           </div>
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Notes / Context (Optional)</label>
-            <textarea placeholder="Any additional context..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 h-20 resize-none" />
+            <textarea placeholder="Any additional context..." value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent outline-none h-20 resize-none" />
           </div>
-          <button type="submit" className="w-full bg-emerald-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20">Submit on behalf of Student</button>
+          <button type="submit" className="w-full bg-emerald-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">Submit on behalf of Student</button>
         </form>
       </Modal>
     </div>
@@ -710,7 +898,6 @@ const CertificatesView = ({ students }) => {
               <option value="AI Innovation Lab - Beginner">AI Innovation Lab - Beginner</option>
               <option value="Robotics Foundation">Robotics Foundation</option>
               <option value="Python Programming 101">Python Programming 101</option>
-              <option value="IoT Excellence">IoT Excellence</option>
             </select>
           </div>
           <button type="submit" className="w-full bg-blue-500 text-white font-black py-3 rounded-xl mt-4 text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20">Issue Credential</button>
@@ -720,22 +907,38 @@ const CertificatesView = ({ students }) => {
   );
 };
 
-/* ── Pending Inbox ─────────────────────────────────────────── */
-const PendingView = () => {
+const PendingView = ({ students = [] }) => {
   const { submissions, grades, leaves } = useStore();
-  const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' | 'leaves'
+  const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' | 'leaves' | 'revisions'
   const [activeGrade, setActiveGrade] = useState({});
+  const [feedbackText, setFeedbackText] = useState({});
   const [expandedId, setExpandedId] = useState(null);
+  const { user } = useAuth();
 
-  const pendingSubs = submissions.filter(s => !grades[s.id]);
-  const gradedSubs  = submissions.filter(s =>  grades[s.id]);
-  const pendingLeaves = leaves.filter(l => l.status === 'pending');
+  const teacherStudentIds = students.map(s => s.id);
+
+  const pendingSubs = submissions.filter(s => s.status === 'pending' && teacherStudentIds.includes(s.studentId));
+  const gradedSubs  = submissions.filter(s => s.status === 'graded' && teacherStudentIds.includes(s.studentId));
+  const awaitingRevisionSubs = submissions.filter(s => s.status === 'needs_revision' && teacherStudentIds.includes(s.studentId));
+  const pendingLeaves = leaves.filter(l => l.status === 'pending' && teacherStudentIds.includes(l.studentId));
 
   const handleGradeSubmit = (id) => {
     if (!activeGrade[id]) return;
-    submitGrade(id, activeGrade[id]);
+    submitGrade(id, activeGrade[id], feedbackText[id] || '');
     setExpandedId(null);
     setActiveGrade(prev => { const n = { ...prev }; delete n[id]; return n; });
+    setFeedbackText(prev => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  const handleRequestRevision = (id) => {
+    if (!feedbackText[id]) {
+      alert('Please provide feedback explaining what needs to be revised.');
+      return;
+    }
+    requestRevision(id, feedbackText[id]);
+    setExpandedId(null);
+    setActiveGrade(prev => { const n = { ...prev }; delete n[id]; return n; });
+    setFeedbackText(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
   return (
@@ -766,13 +969,13 @@ const PendingView = () => {
             <p className="text-3xl font-black text-white">{pendingLeaves.length}</p>
           </div>
         </div>
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-11 h-11 bg-emerald-500/20 rounded-xl flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-11 h-11 bg-orange-500/20 rounded-xl flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-orange-400" />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70 mb-0.5">Graded</p>
-            <p className="text-3xl font-black text-white">{gradedSubs.length}</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-orange-500/70 mb-0.5">Awaiting Revision</p>
+            <p className="text-3xl font-black text-white">{awaitingRevisionSubs.length}</p>
           </div>
         </div>
       </div>
@@ -803,6 +1006,18 @@ const PendingView = () => {
             <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center">{pendingLeaves.length}</span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('revisions')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            activeTab === 'revisions' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' : 'text-zinc-500 hover:text-white'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          Awaiting Revision
+          {awaitingRevisionSubs.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-400 text-[9px] font-black flex items-center justify-center">{awaitingRevisionSubs.length}</span>
+          )}
+        </button>
       </div>
 
       {/* ── Submissions Tab ── */}
@@ -826,7 +1041,7 @@ const PendingView = () => {
                 {/* Row */}
                 <button
                   onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}
-                  className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all"
+                  className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/[0.02] transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 >
                   <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400 font-black text-sm shrink-0">
                     {(s.studentName || 'S')[0]}
@@ -861,10 +1076,10 @@ const PendingView = () => {
                           {(() => {
                             const linkMatch = s.content?.match(/Link:\s*(.*)/);
                             const notesMatch = s.content?.match(/Notes:\s*([\s\S]*)/);
-                            if (linkMatch || notesMatch) {
+                            if (linkMatch || notesMatch || s.attachment) {
                               return (
                                 <div className="space-y-3">
-                                  {linkMatch && linkMatch[1] && (
+                                  {linkMatch && linkMatch[1] && linkMatch[1] !== 'None' && (
                                     <div>
                                       <span className="text-[10px] font-bold text-zinc-500 mr-2">Link:</span>
                                       <a href={linkMatch[1]} target="_blank" rel="noreferrer" className="text-sm font-bold text-blue-400 hover:underline">{linkMatch[1]}</a>
@@ -874,6 +1089,38 @@ const PendingView = () => {
                                     <div>
                                       <span className="text-[10px] font-bold text-zinc-500 block mb-1">Notes:</span>
                                       <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">{notesMatch[1]}</p>
+                                    </div>
+                                  )}
+                                  {s.attachment && (
+                                    <div>
+                                      <span className="text-[10px] font-bold text-zinc-500 block mb-1">Attachment:</span>
+                                      <div className="bg-zinc-900/50 border border-zinc-800/80 p-3 rounded-lg flex items-center justify-between">
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                                            <Paperclip className="w-4 h-4" />
+                                          </div>
+                                          <div>
+                                            <p className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-[300px]">{s.attachment.name}</p>
+                                            <p className="text-[9px] text-zinc-500 font-bold">{(s.attachment.size / 1024).toFixed(1)} KB</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <button 
+                                            type="button"
+                                            onClick={() => handleViewAttachment(s.attachment)}
+                                            className="h-8 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-600/50"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" /> View
+                                          </button>
+                                          <a 
+                                            href={s.attachment.data} 
+                                            download={s.attachment.name}
+                                            className="h-8 px-3 rounded-lg bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                          >
+                                            <Download className="w-3.5 h-3.5" /> Download
+                                          </a>
+                                        </div>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -894,7 +1141,7 @@ const PendingView = () => {
                                 className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
                                   activeGrade[s.id] === g
                                     ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20 scale-105'
-                                    : 'bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700'
+                                    : 'bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/55'
                                 }`}
                               >
                                 {g}
@@ -903,25 +1150,43 @@ const PendingView = () => {
                           </div>
                         </div>
 
+                        {/* Feedback text area */}
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-1.5">Feedback / Revision Requirements</p>
+                          <textarea
+                            value={feedbackText[s.id] || ''}
+                            onChange={(e) => setFeedbackText(prev => ({ ...prev, [s.id]: e.target.value }))}
+                            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent outline-none h-16 resize-none font-medium"
+                            placeholder="Explain what the student did well or what needs to be revised..."
+                          />
+                        </div>
+
                         {/* Actions */}
                         <div className="flex gap-3">
                           <button
                             onClick={() => handleGradeSubmit(s.id)}
                             disabled={!activeGrade[s.id]}
-                            className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                            className={`flex-1 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
                               activeGrade[s.id]
                                 ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20'
-                                : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                                : 'bg-zinc-800 text-zinc-650 cursor-not-allowed'
                             }`}
                           >
                             <CheckCircle2 className="w-4 h-4" />
                             {activeGrade[s.id] ? `Submit Grade: ${activeGrade[s.id]}` : 'Select a Grade First'}
                           </button>
+                          
                           <button
-                            onClick={() => setExpandedId(null)}
-                            className="px-5 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
+                            onClick={() => handleRequestRevision(s.id)}
+                            disabled={!feedbackText[s.id]}
+                            className={`px-5 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-amber-500/50 ${
+                              feedbackText[s.id]
+                                ? 'bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500 hover:text-black shadow-lg'
+                                : 'bg-zinc-800 text-zinc-650 cursor-not-allowed border border-zinc-700'
+                            }`}
                           >
-                            Cancel
+                            <AlertTriangle className="w-4 h-4" />
+                            Request Revision
                           </button>
                         </div>
                       </div>
@@ -992,13 +1257,13 @@ const PendingView = () => {
                   <div className="flex flex-col gap-2 shrink-0">
                     <button
                       onClick={() => { updateLeaveStatus(leave.id, 'approved'); addNotification({ title: 'Leave Approved', body: `${leave.studentName}'s leave has been approved.`, type: 'success' }); }}
-                      className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
+                      className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-emerald-500 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                     >
                       <ThumbsUp className="w-3.5 h-3.5" /> Approve
                     </button>
                     <button
                       onClick={() => { updateLeaveStatus(leave.id, 'rejected'); addNotification({ title: 'Leave Rejected', body: `${leave.studentName}'s leave has been rejected.`, type: 'warning' }); }}
-                      className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                      className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-red-500 hover:text-white transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50"
                     >
                       <ThumbsDown className="w-3.5 h-3.5" /> Reject
                     </button>
@@ -1027,6 +1292,43 @@ const PendingView = () => {
                 ))}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Awaiting Revision Tab ── */}
+      {activeTab === 'revisions' && (
+        <div className="space-y-3">
+          {awaitingRevisionSubs.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-16 flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-zinc-800 border border-zinc-700 rounded-2xl flex items-center justify-center">
+                <Clock className="w-8 h-8 text-zinc-500" />
+              </div>
+              <p className="text-white font-black text-lg">No items awaiting revision</p>
+              <p className="text-zinc-500 text-sm text-center">You haven't requested revision on any recent student projects.</p>
+            </div>
+          ) : (
+            awaitingRevisionSubs.map(s => (
+              <div key={s.id} className="bg-zinc-900 border border-orange-500/15 rounded-2xl p-5 flex items-center gap-4 justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center justify-center text-orange-400 font-black text-sm shrink-0">
+                    {(s.studentName || 'S')[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white">{s.studentName}</p>
+                    <p className="text-xs text-zinc-500 font-medium">Week {s.week}: {s.title}</p>
+                    {s.feedback && (
+                      <div className="mt-2 bg-zinc-950 border border-zinc-850 p-2.5 rounded-lg text-[11px] text-zinc-400 max-w-lg leading-relaxed">
+                        <strong className="text-orange-400/90">My feedback:</strong> "{s.feedback}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[9px] font-black text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1 shrink-0">
+                  <AlertTriangle className="w-2.5 h-2.5" /> Awaiting Revision
+                </span>
+              </div>
+            ))
           )}
         </div>
       )}
@@ -1284,7 +1586,7 @@ const TeacherPanel = () => {
   const views = { 
     overview: <OverviewView stats={stats} />, 
     students: <StudentsView students={students} />, 
-    pending:  <PendingView />,
+    pending:  <PendingView students={students} />,
     submissions: <SubmissionsView students={students} />, 
     exams: <ManageExams />,
     'create-exam': <CreateExam />,

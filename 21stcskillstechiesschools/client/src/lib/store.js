@@ -379,12 +379,12 @@ export const toggleLike = (postId) => {
 };
 
 // ── Grades ──
-export const submitGrade = (submissionId, grade) => {
+export const submitGrade = (submissionId, grade, feedback = '') => {
   const sub = state.submissions.find(s => s.id === submissionId);
   state = { 
     ...state, 
     grades: { ...state.grades, [submissionId]: grade },
-    submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'graded' } : s)
+    submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'graded', feedback } : s)
   };
   // Notify the teacher/admin who graded
   addNotification({ title: 'Grade Submitted', body: `Grade ${grade} recorded for ${sub?.studentName || 'student'}.`, type: 'success' });
@@ -392,7 +392,7 @@ export const submitGrade = (submissionId, grade) => {
   if (sub?.studentId) {
     addNotification({
       title: '🎓 Grade Received!',
-      body: `You received ${grade} for Week ${sub.week}: "${sub.title}". Keep it up!`,
+      body: `You received ${grade} for Week ${sub.week}: "${sub.title}". Feedback: ${feedback || 'None'}`,
       type: 'success',
       targetUser: sub.studentId
     });
@@ -400,16 +400,69 @@ export const submitGrade = (submissionId, grade) => {
   notify();
 };
 
-export const reassignGrade = (submissionId, grade) => submitGrade(submissionId, grade);
+export const requestRevision = (submissionId, feedback = '') => {
+  const sub = state.submissions.find(s => s.id === submissionId);
+  const newGrades = { ...state.grades };
+  delete newGrades[submissionId];
+  
+  state = {
+    ...state,
+    grades: newGrades,
+    submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'needs_revision', feedback } : s)
+  };
+  
+  // Notify the student directly
+  if (sub?.studentId) {
+    addNotification({
+      title: '⚠️ Revision Requested',
+      body: `Your teacher requested a revision for "${sub.title}". Feedback: ${feedback}`,
+      type: 'warning',
+      targetUser: sub.studentId
+    });
+  }
+  notify();
+};
+
+export const reassignGrade = (submissionId, grade, feedback = '') => submitGrade(submissionId, grade, feedback);
 
 export const submitAssignment = (submission) => {
-  const newSub = {
-    id: `sub_${Date.now()}`,
-    submittedAt: 'Just now',
-    status: 'pending',
-    ...submission
-  };
-  state = { ...state, submissions: [newSub, ...state.submissions] };
+  const existingIndex = state.submissions.findIndex(
+    s => s.studentId === submission.studentId && s.title === submission.title
+  );
+
+  let newSub;
+  if (existingIndex !== -1) {
+    const existing = state.submissions[existingIndex];
+    newSub = {
+      ...existing,
+      submittedAt: 'Just now',
+      status: 'pending',
+      content: submission.content,
+      attachment: submission.attachment || null,
+      feedback: '' // clear feedback on resubmission
+    };
+    
+    const newGrades = { ...state.grades };
+    delete newGrades[existing.id];
+
+    const updatedSubmissions = [...state.submissions];
+    updatedSubmissions[existingIndex] = newSub;
+    
+    state = { 
+      ...state, 
+      submissions: updatedSubmissions,
+      grades: newGrades
+    };
+  } else {
+    newSub = {
+      id: `sub_${Date.now()}`,
+      submittedAt: 'Just now',
+      status: 'pending',
+      ...submission
+    };
+    state = { ...state, submissions: [newSub, ...state.submissions] };
+  }
+
   // Notify all teachers in the same school
   const teachersInSchool = state.users.filter(u => u.role === 'teacher' && u.schoolId === submission.schoolId);
   teachersInSchool.forEach(t => {
@@ -423,6 +476,7 @@ export const submitAssignment = (submission) => {
   notify();
   return newSub;
 };
+
 
 
 // ── Hubs ──

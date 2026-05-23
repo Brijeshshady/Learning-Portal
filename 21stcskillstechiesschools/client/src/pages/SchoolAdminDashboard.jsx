@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin, Clock, ThumbsUp, ThumbsDown, Inbox, ClipboardList, Rocket, ShieldCheck } from 'lucide-react';
+import { Building2, Users, UserCog, BarChart3, TrendingUp, Activity, ArrowRight, PlusCircle, Search, Download, CheckCircle2, AlertCircle, Award, Eye, Calendar, Lock, AlertTriangle, UserCheck, FileText, MapPin, Clock, ThumbsUp, ThumbsDown, Inbox, ClipboardList, Rocket, ShieldCheck, Paperclip } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import { getHubData } from '../lib/mapping';
@@ -1151,6 +1151,31 @@ const SchoolAttendanceView = () => {
   );
 };
 
+const handleViewAttachment = (attachment) => {
+  if (!attachment || !attachment.data) return;
+  try {
+    const parts = attachment.data.split(',');
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    
+    const blob = new Blob([ab], { type: mimeString });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, '_blank');
+  } catch (e) {
+    console.error(e);
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(`<iframe src="${attachment.data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+    }
+  }
+};
+
 /* ── Hub Pending View ────────────────────────────────── */
 const HubPendingView = () => {
   const { user } = useAuth();
@@ -1195,6 +1220,7 @@ const HubPendingView = () => {
     submitAssignment({
       studentId: student.id,
       studentName: student.name,
+      schoolId: student.schoolId,
       week: Number(formData.week),
       title: formData.title,
       content: formData.link || formData.notes ? `Link: ${formData.link}\nNotes: ${formData.notes}` : 'Offline Submission'
@@ -1358,9 +1384,63 @@ const HubPendingView = () => {
                   {expandedId === s.id && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-zinc-800">
                       <div className="p-6 space-y-4">
-                        <div className="bg-zinc-800/60 rounded-xl p-4">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Content</p>
-                          <p className="text-sm text-zinc-300">{s.content || 'No content.'}</p>
+                        <div className="bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-4">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Submission Details</p>
+                          {(() => {
+                            const linkMatch = s.content?.match(/Link:\s*(.*)/);
+                            const notesMatch = s.content?.match(/Notes:\s*([\s\S]*)/);
+                            if (linkMatch || notesMatch || s.attachment) {
+                              return (
+                                <div className="space-y-3">
+                                  {linkMatch && linkMatch[1] && linkMatch[1] !== 'None' && (
+                                    <div>
+                                      <span className="text-[10px] font-bold text-zinc-500 mr-2">Link:</span>
+                                      <a href={linkMatch[1]} target="_blank" rel="noreferrer" className="text-sm font-bold text-emerald-400 hover:underline">{linkMatch[1]}</a>
+                                    </div>
+                                  )}
+                                  {notesMatch && notesMatch[1] && (
+                                    <div>
+                                      <span className="text-[10px] font-bold text-zinc-500 block mb-1">Notes:</span>
+                                      <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap bg-zinc-900/50 p-3 rounded-lg border border-zinc-850">{notesMatch[1]}</p>
+                                    </div>
+                                  )}
+                                  {s.attachment && (
+                                    <div>
+                                      <span className="text-[10px] font-bold text-zinc-500 block mb-1">Attachment:</span>
+                                      <div className="bg-zinc-900/50 border border-zinc-800/80 p-3 rounded-lg flex items-center justify-between">
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                            <Paperclip className="w-4 h-4" />
+                                          </div>
+                                          <div>
+                                            <p className="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-[300px]">{s.attachment.name}</p>
+                                            <p className="text-[9px] text-zinc-500 font-bold">{(s.attachment.size / 1024).toFixed(1)} KB</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <button 
+                                            type="button"
+                                            onClick={() => handleViewAttachment(s.attachment)}
+                                            className="h-8 px-3 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-600/50"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" /> View
+                                          </button>
+                                          <a 
+                                            href={s.attachment.data} 
+                                            download={s.attachment.name}
+                                            className="h-8 px-3 rounded-lg bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                          >
+                                            <Download className="w-3.5 h-3.5" /> Download
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{s.content || 'No content provided.'}</p>;
+                          })()}
                         </div>
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">Assign Grade</p>
