@@ -11,6 +11,7 @@ import Modal from '../components/Modal';
 import html2pdf from 'html2pdf.js';
 import CertificateTemplate from '../components/CertificateTemplate';
 import ExamAnalytics from './ExamAnalytics';
+import ProjectsManager from '../components/ProjectsManager';
 
 import {
   PageHeader, KpiGrid, KpiCard, ChartRow,
@@ -1179,12 +1180,12 @@ const handleViewAttachment = (attachment) => {
 /* ── Hub Pending View ────────────────────────────────── */
 const HubPendingView = () => {
   const { user } = useAuth();
-  const { users, submissions = [], grades = {}, leaves = [] } = useStore();
+  const { users, submissions = [], grades = {}, leaves = [], projects = [] } = useStore();
   const [activeTab, setActiveTab] = useState('leaves');
   const [expandedId, setExpandedId] = useState(null);
   const [activeGrade, setActiveGrade] = useState({});
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [formData, setFormData] = useState({ studentId: '', week: 1, title: '', link: '', notes: '' });
+  const [formData, setFormData] = useState({ studentId: '', projectId: '', week: 1, title: '', link: '', notes: '' });
 
   const hubStudents = users.filter(u => u.schoolId === user?.schoolId && u.role === 'student');
 
@@ -1228,7 +1229,7 @@ const HubPendingView = () => {
     
     addNotification({ title: 'Submission Created', body: `Recorded for ${student.name}`, type: 'success' });
     setShowCreateModal(false);
-    setFormData({ studentId: '', week: 1, title: '', link: '', notes: '' });
+    setFormData({ studentId: '', projectId: '', week: 1, title: '', link: '', notes: '' });
   };
 
   return (
@@ -1476,20 +1477,37 @@ const HubPendingView = () => {
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Student</label>
-            <select required value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50">
+            <select required value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value, projectId: '', title: '', week: 1})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50">
               <option value="" disabled>Select a student...</option>
               {hubStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Week Number</label>
-              <input required type="number" min="1" max="36" value={formData.week} onChange={(e) => setFormData({...formData, week: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Title</label>
-              <input required type="text" placeholder="e.g. AI Model" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50" />
-            </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Select Project</label>
+            <select 
+              required 
+              disabled={!formData.studentId}
+              value={formData.projectId} 
+              onChange={(e) => {
+                const proj = projects.find(p => p.id === e.target.value);
+                setFormData({
+                  ...formData,
+                  projectId: e.target.value,
+                  title: proj?.title || '',
+                  week: proj?.week || 1
+                });
+              }} 
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="" disabled>{formData.studentId ? "Select a project..." : "Please select a student first..."}</option>
+              {projects
+                .filter(p => {
+                  const s = hubStudents.find(x => x.id === formData.studentId);
+                  return !s || p.grade === 'All' || String(p.grade) === String(s.grade) || !p.grade;
+                })
+                .map(p => <option key={p.id} value={p.id}>{p.title} (Week {p.week} · {p.type})</option>)
+              }
+            </select>
           </div>
           <div>
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-1">Project Link (Optional)</label>
@@ -1545,6 +1563,7 @@ const SchoolAdminDashboard = () => {
   const views = { 
     overview:     <OverviewView schoolData={schoolData} stats={stats} />, 
     users:        <UsersView />, 
+    projects:     <ProjectsManager userRole="school-admin" />,
     analytics:    <AnalyticsView />, 
     'exam-analytics': <ExamAnalytics />,
     attendance:   <SchoolAttendanceView />,

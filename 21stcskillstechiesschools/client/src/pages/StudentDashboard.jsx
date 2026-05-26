@@ -286,8 +286,18 @@ const AILabView = () => {
 };
 
 /* ── Projects ─────────────────────────────────────────────── */
+const getProjectStyles = (type) => {
+  const t = (type || '').toUpperCase();
+  if (t === 'IOT') return { borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400' };
+  if (t === 'AI') return { borderClass: 'border-primary/20', textClass: 'text-primary' };
+  if (t === 'ML') return { borderClass: 'border-secondary/20', textClass: 'text-secondary' };
+  if (t === 'CODING') return { borderClass: 'border-blue-500/20', textClass: 'text-blue-400' };
+  if (t === 'ROBOTICS') return { borderClass: 'border-amber-500/20', textClass: 'text-amber-400' };
+  return { borderClass: 'border-purple-500/20', textClass: 'text-purple-400' };
+};
+
 const ProjectsView = ({ user }) => {
-  const { submissions, grades } = useStore();
+  const { projects = [], submissions = [], grades = {}, extensions = [] } = useStore();
   const [submitProject, setSubmitProject] = useState(null);
   const [viewProjectDetails, setViewProjectDetails] = useState(null);
   const [projectLink, setProjectLink] = useState('');
@@ -383,92 +393,176 @@ const ProjectsView = ({ user }) => {
 
   const getStatus = (p) => {
     const sub = submissions.find(s => s.studentId === user.id && s.title === p.title);
-    if (!sub) return { status: 'pending_submission' };
-    if (sub.status === 'graded') {
-      return { status: 'graded', grade: grades[sub.id] || 'A', feedback: sub.feedback, submission: sub };
+    const extension = extensions.find(e => e.studentId === user.id && e.projectId === p.id);
+    const deadline = extension?.newDeadline || p.endDate;
+    
+    let isOverdue = false;
+    if (!sub || sub.status === 'needs_revision') {
+      if (deadline) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        isOverdue = todayStr > deadline;
+      }
     }
-    if (sub.status === 'needs_revision') {
-      return { status: 'needs_revision', feedback: sub.feedback, submission: sub };
+
+    if (sub) {
+      if (sub.status === 'graded') {
+        return { status: 'graded', grade: grades[sub.id] || 'A', feedback: sub.feedback, submission: sub, extension, isOverdue };
+      }
+      if (sub.status === 'needs_revision') {
+        return { status: 'needs_revision', feedback: sub.feedback, submission: sub, extension, isOverdue };
+      }
+      return { status: 'under_review', submission: sub, extension, isOverdue };
     }
-    return { status: 'under_review', submission: sub };
+
+    return { status: isOverdue ? 'overdue' : 'pending_submission', extension, isOverdue };
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-black font-headline tracking-tighter text-white">My Projects</h2>
-        <p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have built.</p>
+        <p className="text-zinc-500 text-sm mt-1">Capstone and module projects you have been assigned.</p>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          { title: 'Smart Room Controller', week: 3, type: 'IoT', borderClass: 'border-emerald-500/20', textClass: 'text-emerald-400' },
-          { title: 'AI Chatbot v1',         week: 5, type: 'AI',  borderClass: 'border-primary/20',     textClass: 'text-primary' },
-          { title: 'Neural Logic Trainer',  week: 7, type: 'ML',  borderClass: 'border-secondary/20',   textClass: 'text-secondary' },
-        ].map((p) => {
-          const info = getStatus(p);
-          return (
-            <SectionCard key={p.title} className={`border flex flex-col justify-between ${p.borderClass}`}>
-              <div>
-                <div className="flex items-start justify-between mb-3">
-                  <span className={`text-[9px] font-black uppercase tracking-widest ${p.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
-                  {info.status === 'graded' ? (
-                    <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">Grade: {info.grade}</span>
-                  ) : info.status === 'needs_revision' ? (
-                    <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">Revision Required</span>
-                  ) : info.status === 'under_review' ? (
-                    <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">Under Review</span>
-                  ) : (
-                    <span className="text-[9px] font-black text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-1 rounded-lg">In Progress</span>
-                  )}
-                </div>
-                <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Week {p.week}</p>
-                <h3 className="text-base font-black text-white mb-2 leading-tight">{p.title}</h3>
-                
-                {/* Inline feedback if revision requested */}
-                {info.status === 'needs_revision' && (
-                  <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-400 mb-1">Teacher Feedback</p>
-                    <p className="text-zinc-300 italic font-medium leading-relaxed">"{info.feedback || 'Please revise and resubmit your implementation.'}"</p>
+        {projects.filter(p => p.grade === 'All' || String(p.grade) === String(user.grade) || !p.grade).length === 0 ? (
+          <div className="col-span-full bg-zinc-900 border border-zinc-800 rounded-3xl p-16 text-center text-zinc-500 font-bold text-xs">
+            No projects assigned to Grade {user.grade} yet.
+          </div>
+        ) : (
+          projects
+            .filter(p => p.grade === 'All' || String(p.grade) === String(user.grade) || !p.grade)
+            .map((p) => {
+              const styles = getProjectStyles(p.type);
+              const info = getStatus(p);
+              return (
+                <SectionCard key={p.title} className={`border flex flex-col justify-between ${styles.borderClass}`}>
+                  <div>
+                    <div className="flex items-start justify-between mb-3">
+                      <span className={`text-[9px] font-black uppercase tracking-widest ${styles.textClass} bg-white/5 px-2 py-1 rounded-lg`}>{p.type}</span>
+                      {info.status === 'graded' ? (
+                        <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">Grade: {info.grade}</span>
+                      ) : info.status === 'needs_revision' ? (
+                        <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">Revision Required</span>
+                      ) : info.status === 'under_review' ? (
+                        <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">Under Review</span>
+                      ) : info.status === 'overdue' ? (
+                        <span className="text-[9px] font-black text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5" /> Overdue</span>
+                      ) : (
+                        <span className="text-[9px] font-black text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-1 rounded-lg">In Progress</span>
+                      )}
+                    </div>
+                    <p className="text-[9px] font-black text-zinc-650 uppercase tracking-widest mb-1">
+                      Week {p.startWeek && p.endWeek ? `${p.startWeek} - ${p.endWeek}` : p.week}
+                    </p>
+                    <h3 className="text-base font-black text-white mb-2 leading-tight">{p.title}</h3>
+                    
+                    {/* Description */}
+                    <p className="text-xs text-zinc-400 font-medium leading-relaxed mb-4">{p.desc || 'No instructions provided.'}</p>
+
+                    {/* Timeline dates if set */}
+                    {(p.startDate || p.endDate) && (
+                      <div className="mb-4 text-[10px] text-zinc-500 font-bold flex items-center gap-1.5 bg-zinc-900/40 border border-zinc-800 p-2 rounded-xl">
+                        <Calendar className="w-3.5 h-3.5 text-zinc-655" />
+                        <span>
+                          Timeline: {p.startDate && p.endDate ? `${p.startDate} to ${p.endDate}` : p.endDate ? `Due: ${p.endDate}` : `Start: ${p.startDate}`}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Extension Alert Banner */}
+                    {info.extension && (
+                      <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs flex items-start gap-2">
+                        <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-amber-400 mb-0.5">Submission Extended</p>
+                          <p className="text-zinc-300 font-bold">New Deadline: {info.extension.newDeadline}</p>
+                          {info.extension.reason && <p className="text-zinc-500 italic mt-1">"{info.extension.reason}"</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Instruction link */}
+                    {p.link && (
+                      <div className="mb-4">
+                        <a 
+                          href={p.link} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 hover:underline bg-blue-500/5 border border-blue-500/10 px-3 py-1.5 rounded-xl transition-all"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> View Project Instructions
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Additional Resources */}
+                    {p.resources && p.resources.length > 0 && (
+                      <div className="mb-4 space-y-1.5">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-zinc-555 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" /> Learning Resources:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {p.resources.map((res, idx) => (
+                            <a 
+                              key={idx} 
+                              href={res.url} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 px-2.5 py-1 rounded-lg hover:bg-zinc-800 transition-all truncate max-w-[180px]"
+                            >
+                              <BookOpen className="w-2.5 h-2.5 text-zinc-550 shrink-0" />
+                              <span className="truncate">{res.name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Inline feedback if revision requested */}
+                    {info.status === 'needs_revision' && (
+                      <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-amber-400 mb-1">Teacher Feedback</p>
+                        <p className="text-zinc-300 italic font-medium leading-relaxed">"{info.feedback || 'Please revise and resubmit your implementation.'}"</p>
+                      </div>
+                    )}
+                    
+                    {/* Inline grade feedback if available */}
+                    {info.status === 'graded' && info.feedback && (
+                      <div className="mb-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 text-xs">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">Teacher Comments</p>
+                        <p className="text-zinc-400 font-medium leading-relaxed">"{info.feedback}"</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                
-                {/* Inline grade feedback if available */}
-                {info.status === 'graded' && info.feedback && (
-                  <div className="mb-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 text-xs">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-1">Teacher Comments</p>
-                    <p className="text-zinc-400 font-medium leading-relaxed">"{info.feedback}"</p>
+                  
+                  <div className="mt-4">
+                    {info.status === 'needs_revision' ? (
+                      <button 
+                        onClick={() => handleOpenSubmit(p, info.submission)} 
+                        className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-500 text-black hover:bg-amber-400 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                      >
+                        <Award className="w-3.5 h-3.5" /> Revise & Resubmit
+                      </button>
+                    ) : info.status === 'graded' || info.status === 'under_review' ? (
+                      <button 
+                        onClick={() => setViewProjectDetails(info.submission)}
+                        className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${styles.borderClass} ${styles.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary/50`}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> View Submission
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleOpenSubmit(p)} 
+                        className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary/50"
+                      >
+                        <Award className="w-3.5 h-3.5" /> Submit Project
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
-              
-              <div className="mt-4">
-                {info.status === 'needs_revision' ? (
-                  <button 
-                    onClick={() => handleOpenSubmit(p, info.submission)} 
-                    className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-500 text-black hover:bg-amber-400 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                  >
-                    <Award className="w-3.5 h-3.5" /> Revise & Resubmit
-                  </button>
-                ) : info.status === 'graded' || info.status === 'under_review' ? (
-                  <button 
-                    onClick={() => setViewProjectDetails(info.submission)}
-                    className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${p.borderClass} ${p.textClass} hover:bg-white/5 transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary/50`}
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" /> View Submission
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => handleOpenSubmit(p)} 
-                    className="w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-secondary text-white hover:bg-purple-600 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)] flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-secondary/50"
-                  >
-                    <Award className="w-3.5 h-3.5" /> Submit Project
-                  </button>
-                )}
-              </div>
-            </SectionCard>
-          );
-        })}
+                </SectionCard>
+              );
+            }))}
       </div>
 
       {/* Submit Project Modal */}
@@ -503,7 +597,7 @@ const ProjectsView = ({ user }) => {
                 <p className="text-[10px] text-zinc-600 font-medium">PDF, ZIP, PNG, JPG up to 2MB</p>
               </div>
             ) : (
-              <div className="bg-zinc-850/80 border border-zinc-700 rounded-xl p-3.5 flex items-center justify-between">
+              <div className="bg-zinc-800/80 border border-zinc-700 rounded-xl p-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-secondary/15 flex items-center justify-center text-secondary">
                     <Paperclip className="w-4 h-4" />

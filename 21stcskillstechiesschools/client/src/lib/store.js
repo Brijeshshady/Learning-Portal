@@ -108,6 +108,61 @@ const initialCertificates = [
   { id: 'CERT-X9Y8-Z7W6', studentId: 'u2', studentName: 'Priya Selvi', schoolId: 'HUB-CH-01', title: 'Robotics Foundation', issuedBy: 'Hub Admin', date: '2026-04-15' },
 ];
 
+const initialProjects = [
+  { 
+    id: 'proj_1', 
+    title: 'Smart Room Controller', 
+    type: 'IoT', 
+    grade: 'All', 
+    desc: 'Design and code a Smart Room controller to automate lights, fan, and door triggers.',
+    startWeek: 2,
+    endWeek: 4,
+    startDate: '2026-05-10',
+    endDate: '2026-06-10',
+    link: 'https://github.com/21stc-techies/smart-room',
+    resources: [{ name: 'IoT Fundamentals PDF', url: 'https://example.com/iot-guide.pdf' }]
+  },
+  { 
+    id: 'proj_2', 
+    title: 'AI Chatbot v1',         
+    type: 'AI',  
+    grade: 'All', 
+    desc: 'Create a conversational agent using local LLM rules or simple NLP processing.',
+    startWeek: 4,
+    endWeek: 6,
+    startDate: '2026-05-15',
+    endDate: '2026-06-15',
+    link: 'https://github.com/21stc-techies/ai-chatbot',
+    resources: [{ name: 'NLP Intro Slides', url: 'https://example.com/nlp-slides.pdf' }]
+  },
+  { 
+    id: 'proj_3', 
+    title: 'Neural Network Basics',  
+    type: 'ML',  
+    grade: 'All', 
+    desc: 'Write a basic neural network forward pass and training loop from scratch.',
+    startWeek: 5,
+    endWeek: 7,
+    startDate: '2026-05-20',
+    endDate: '2026-06-20',
+    link: 'https://github.com/21stc-techies/nn-basics',
+    resources: [{ name: 'Neural Nets Explained', url: 'https://example.com/nn-basics.html' }]
+  },
+  { 
+    id: 'proj_4', 
+    title: 'Neural Logic Trainer',  
+    type: 'ML',  
+    grade: 'All', 
+    desc: 'Build an interactive dashboard to train perceptrons for logical AND/OR gates.',
+    startWeek: 6,
+    endWeek: 8,
+    startDate: '2026-05-25',
+    endDate: '2026-06-25',
+    link: 'https://github.com/21stc-techies/perceptron-trainer',
+    resources: []
+  }
+];
+
 /* ── Store state ───────────────────────────────────────────────────────── */
 const STORAGE_KEY = 'learning_portal_state_v2';
 
@@ -124,6 +179,8 @@ const loadState = () => {
     teacherAttendance: initialTeacherAttendance,
     submissions: initialSubmissions,
     certificates: initialCertificates,
+    projects: initialProjects,
+    extensions: [],
     maintenanceMode: initialMaintenanceMode,
   };
 
@@ -154,6 +211,12 @@ const loadState = () => {
       }
       if (!merged.certificates || !Array.isArray(merged.certificates)) {
         merged.certificates = initialCertificates;
+      }
+      if (!merged.projects || !Array.isArray(merged.projects)) {
+        merged.projects = initialProjects;
+      }
+      if (!merged.extensions || !Array.isArray(merged.extensions)) {
+        merged.extensions = [];
       }
       // Ensure all leaves have studentName (backfill from users if missing)
       merged.leaves = merged.leaves.map(l => ({
@@ -684,6 +747,41 @@ export const addCertificate = (cert) => {
 
 export const removeCertificate = (id) => {
   state = { ...state, certificates: state.certificates.filter((c) => c.id !== id) };
+  notify();
+};
+
+// ── Projects ──
+export const addProject = (project) => {
+  const newProj = {
+    ...project,
+    id: `proj_${Date.now()}`
+  };
+  state = { ...state, projects: [newProj, ...state.projects] };
+  notify();
+  return newProj;
+};
+
+export const removeProject = (id) => {
+  state = { ...state, projects: state.projects.filter((p) => p.id !== id) };
+  notify();
+};
+
+// ── Extensions ──
+export const grantExtension = (extension) => {
+  const newExt = {
+    id: `ext_${Date.now()}`,
+    ...extension
+  };
+  const filtered = (state.extensions || []).filter(
+    e => !(e.studentId === extension.studentId && e.projectId === extension.projectId)
+  );
+  state = { ...state, extensions: [newExt, ...filtered] };
+  notify();
+  return newExt;
+};
+
+export const removeExtension = (id) => {
+  state = { ...state, extensions: (state.extensions || []).filter(e => e.id !== id) };
   notify();
 };
 

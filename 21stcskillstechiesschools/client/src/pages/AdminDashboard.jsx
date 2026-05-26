@@ -17,6 +17,7 @@ import useStore from '../hooks/useStore';
 import { addUser, removeUser, updateUser, addHub, updateHub, removeHub, exportCSV, generateLicenseKey, addNotification, setMaintenanceMode, setHubMaintenance, getState, markAttendance, setHubs } from '../lib/store';
 import DB from '../lib/db';
 import ExamAnalytics from './ExamAnalytics';
+import ProjectsManager from '../components/ProjectsManager';
 
 
 
@@ -2511,6 +2512,8 @@ const AdminDashboard = () => {
         return <UsersView />;
       case 'schools':
         return <HubRegistryView />;
+      case 'projects':
+        return <ProjectsManager userRole="admin" />;
       case 'certificates':
         return <CertificatesView />;
       case 'activation':

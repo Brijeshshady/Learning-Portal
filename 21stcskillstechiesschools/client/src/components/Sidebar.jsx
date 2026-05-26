@@ -44,6 +44,7 @@ const MENUS = {
       { name: 'Overview',      view: 'dashboard', icon: LayoutDashboard },
       { name: 'User Registry', view: 'users',     icon: Users },
       { name: 'Hub Registry',  view: 'schools',   icon: Database },
+      { name: 'Manage Projects', view: 'projects', icon: Rocket },
       { name: 'Certificates',  view: 'certificates', icon: Award },
       { name: 'Attendance',    view: 'attendance',   icon: Calendar },
       { name: 'License Keys',  view: 'activation',icon: Key },
@@ -61,6 +62,7 @@ const MENUS = {
     links: [
       { name: 'Institution',  view: 'overview',   icon: ShieldCheck },
       { name: 'Manage Users', view: 'users',      icon: UserCog },
+      { name: 'Manage Projects', view: 'projects', icon: Rocket },
       { name: 'Attendance',   view: 'attendance', icon: Calendar },
       { name: 'Hub Pending',  view: 'pending',    icon: Inbox, badge: true },
       { name: 'Certificates', view: 'certificates', icon: Award },
@@ -77,6 +79,7 @@ const MENUS = {
     links: [
       { name: 'Class Overview',  view: 'overview',     icon: LayoutDashboard },
       { name: 'Student List',    view: 'students',     icon: Users },
+      { name: 'Manage Projects', view: 'projects',     icon: Rocket },
       { name: 'Attendance',      view: 'attendance',   icon: Calendar },
       { name: 'Pending Inbox',   view: 'pending',      icon: Inbox, badge: true },
       { name: 'Submissions',     view: 'submissions',  icon: ClipboardList },
