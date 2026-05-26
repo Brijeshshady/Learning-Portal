@@ -144,8 +144,8 @@ exports.runCodingTests = async (code, testCases) => {
     }
     
     return {
-        passedAll: passed === testCases.length,
-        scorePercent: (passed / testCases.length) * 100,
+        passedAll: testCases.length > 0 ? passed === testCases.length : false,
+        scorePercent: testCases.length > 0 ? (passed / testCases.length) * 100 : 0,
         feedback
     };
 };

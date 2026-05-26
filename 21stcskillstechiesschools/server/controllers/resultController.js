@@ -138,18 +138,27 @@ exports.saveManualEvaluation = async (req, res) => {
         // Update individual scores and feedback
         let totalScore = 0;
         let maxPossibleScore = 0;
+        const topicCounts = {};
+        const subject = exam.subject || 'General';
         
         const updatedAnswers = attempt.answers.map(ans => {
             const q = questionsMap.get(ans.questionId);
             if (!q) return ans;
             
             maxPossibleScore += q.marks;
+            if (!topicCounts[subject]) {
+                topicCounts[subject] = { correct: 0, total: q.marks };
+            } else {
+                topicCounts[subject].total += q.marks;
+            }
+            
             const override = gradedAnswers.find(g => g.questionId === ans.questionId);
             
             if (override) {
                 const score = Number(override.score);
                 const isCorrect = score >= q.marks / 2;
                 totalScore += score;
+                topicCounts[subject].correct += score;
                 return {
                     questionId: ans.questionId,
                     answer: ans.answer,
@@ -158,7 +167,9 @@ exports.saveManualEvaluation = async (req, res) => {
                     feedback: override.feedback
                 };
             } else {
-                totalScore += ans.score || 0;
+                const score = ans.score || 0;
+                totalScore += score;
+                topicCounts[subject].correct += score;
                 return ans;
             }
         });
@@ -171,6 +182,13 @@ exports.saveManualEvaluation = async (req, res) => {
         // Recalculate percentage
         const percentage = maxPossibleScore > 0 ? Number(((totalScore / maxPossibleScore) * 100).toFixed(2)) : 0;
         
+        // Recalculate topic analysis
+        const topicWiseAnalysis = Object.keys(topicCounts).map(topic => ({
+            topic,
+            correct: topicCounts[topic].correct,
+            total: topicCounts[topic].total
+        }));
+        
         // Update/create Result record
         const resultId = `RES-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Date.now().toString().slice(-4)}`;
         const result = await Result.findOneAndUpdate(
@@ -180,15 +198,15 @@ exports.saveManualEvaluation = async (req, res) => {
                     marksObtained: totalScore,
                     totalMarks: maxPossibleScore,
                     percentage,
-                    remarks: `Manual grading completed by ${req.user.name}.`
+                    remarks: `Manual grading completed by ${req.user.name}.`,
+                    topicWiseAnalysis
                 },
                 $setOnInsert: {
                     id: resultId,
                     examId: attempt.examId,
                     studentId: attempt.studentId,
                     strengths: ["Robotics Basics"],
-                    weakAreas: ["Complex Conditions"],
-                    topicWiseAnalysis: []
+                    weakAreas: ["Complex Conditions"]
                 }
             },
             { upsert: true, new: true }

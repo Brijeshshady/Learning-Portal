@@ -161,6 +161,10 @@ exports.getAttempt = async (req, res) => {
             return qObj;
         });
         
+        // Sort questions based on the randomized sequence stored in attempt.answers
+        const orderMap = new Map(attempt.answers.map((ans, idx) => [ans.questionId, idx]));
+        secureQuestions.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+        
         res.json({ attempt, questions: secureQuestions });
     } catch (err) {
         res.status(500).json({ error: err.message });

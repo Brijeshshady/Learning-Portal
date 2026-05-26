@@ -6,9 +6,9 @@ import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
 import { html } from '@codemirror/lang-html';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { 
-  Play, Sparkles, BookOpen, History, Award, CheckCircle2, 
-  Terminal, Code2, AlertCircle, RefreshCw, ChevronRight, X, Pin, Trash2 
+import {
+  Play, Sparkles, BookOpen, History, Award, CheckCircle2,
+  Terminal, Code2, AlertCircle, RefreshCw, ChevronRight, X, Pin, Trash2
 } from 'lucide-react';
 import DB from '../lib/db';
 import { addNotification } from '../lib/store';
@@ -314,7 +314,7 @@ const CodingPlayground = () => {
       }
       setIsRunning(false);
       handleSaveToHistory(`Run (JS) - ${new Date().toLocaleTimeString()}`);
-    } 
+    }
     // Python AI simulation execution
     else if (lang === 'python') {
       try {
@@ -417,14 +417,13 @@ const CodingPlayground = () => {
           {/* Language Selector */}
           <div className="bg-zinc-950/80 border border-zinc-800 rounded-2xl p-1 flex">
             {['javascript', 'python', 'html'].map((l) => (
-              <button 
+              <button
                 key={l}
                 onClick={() => handleLanguageChange(l)}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                  lang === l 
-                    ? 'bg-zinc-800 text-white shadow-lg' 
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${lang === l
+                    ? 'bg-zinc-800 text-white shadow-lg'
                     : 'text-zinc-500 hover:text-zinc-300'
-                }`}
+                  }`}
               >
                 {l === 'javascript' ? 'JS' : l === 'python' ? 'Python' : 'HTML'}
               </button>
@@ -440,14 +439,14 @@ const CodingPlayground = () => {
           </div>
 
           {/* Challenges & History Toggles */}
-          <button 
+          <button
             onClick={() => { setShowChallenges(true); setShowHistory(false); }}
             className="flex items-center gap-1.5 px-3 py-2 bg-zinc-850 border border-zinc-850 hover:border-zinc-700 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all"
           >
             <Award className="w-3.5 h-3.5 text-amber-400" />
             Challenges
           </button>
-          <button 
+          <button
             onClick={() => { setShowHistory(true); setShowChallenges(false); }}
             className="flex items-center gap-1.5 px-3 py-2 bg-zinc-850 border border-zinc-850 hover:border-zinc-700 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all"
           >
@@ -459,7 +458,7 @@ const CodingPlayground = () => {
 
       {/* Main Content Workspace Layout */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 overflow-hidden">
-        
+
         {/* Active Challenge Info Banner (if loaded) */}
         {activeChallenge && (
           <div className="lg:col-span-12 bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex items-start justify-between">
@@ -486,10 +485,10 @@ const CodingPlayground = () => {
               <span className="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">Editor ({lang})</span>
             </div>
-            
+
             {/* Quick Action Toolbar */}
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={explainCode}
                 disabled={isAiLoading}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/30 border border-cyan-800/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-cyan-400 hover:bg-cyan-850/40 disabled:opacity-50 transition-all"
@@ -498,7 +497,7 @@ const CodingPlayground = () => {
                 <BookOpen className="w-3 h-3" />
                 Explain
               </button>
-              <button 
+              <button
                 onClick={debugCodeUpdated}
                 disabled={isAiLoading}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/30 border border-amber-800/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-amber-400 hover:bg-amber-850/40 disabled:opacity-50 transition-all"
@@ -507,7 +506,7 @@ const CodingPlayground = () => {
                 <Sparkles className="w-3 h-3" />
                 AI Debug
               </button>
-              <button 
+              <button
                 onClick={runCode}
                 disabled={isRunning}
                 className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/20"
@@ -531,39 +530,36 @@ const CodingPlayground = () => {
 
         {/* RIGHT COLUMN: Output Console / AI Assistant Panels (Col Span 5) */}
         <div className="lg:col-span-5 flex flex-col gap-5 overflow-hidden">
-          
+
           {/* Header/Tabs */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl">
             <div className="flex border-b border-zinc-800 bg-zinc-900/30 p-2 gap-1.5">
-              <button 
+              <button
                 onClick={() => setActiveTab('console')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  activeTab === 'console' 
-                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md' 
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'console'
+                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <Terminal className="w-3.5 h-3.5" />
                 Console
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('debug')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  activeTab === 'debug' 
-                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md' 
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'debug'
+                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 AI Debugger
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('explain')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  activeTab === 'explain' 
-                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md' 
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'explain'
+                    ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md'
                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                }`}
+                  }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 Explanation
@@ -577,7 +573,7 @@ const CodingPlayground = () => {
                   {lang === 'html' ? (
                     // Live HTML Render Iframe
                     <div className="w-full h-full bg-white rounded-2xl overflow-hidden border border-zinc-800">
-                      <iframe 
+                      <iframe
                         ref={outputFrameRef}
                         title="HTML Sandbox Output"
                         srcDoc={code}
@@ -652,16 +648,15 @@ const CodingPlayground = () => {
 
               <div className="space-y-4">
                 {CHALLENGES.map((ch) => (
-                  <div 
-                    key={ch.id} 
+                  <div
+                    key={ch.id}
                     onClick={() => loadChallenge(ch)}
                     className="p-4 bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 rounded-2xl cursor-pointer transition-all hover:bg-zinc-900 group"
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        ch.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10' :
-                        ch.difficulty === 'Medium' ? 'text-amber-400 bg-amber-500/10' : 'text-red-400 bg-red-500/10'
-                      }`}>
+                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${ch.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10' :
+                          ch.difficulty === 'Medium' ? 'text-amber-400 bg-amber-500/10' : 'text-red-400 bg-red-500/10'
+                        }`}>
                         {ch.difficulty}
                       </span>
                       <span className="text-[8px] font-black uppercase text-zinc-500 tracking-widest">{ch.lang}</span>
@@ -698,8 +693,8 @@ const CodingPlayground = () => {
                   <div className="text-center text-zinc-600 py-12 text-xs italic">No code execution history saved yet.</div>
                 ) : (
                   historyList.map((item) => (
-                    <div 
-                      key={item.id} 
+                    <div
+                      key={item.id}
                       onClick={() => handleLoadHistory(item)}
                       className="p-4 bg-zinc-900/60 border border-zinc-800 hover:border-primary/40 rounded-2xl cursor-pointer transition-all hover:bg-zinc-900 flex justify-between items-start group"
                     >
@@ -712,15 +707,15 @@ const CodingPlayground = () => {
                         <p className="text-[10px] text-zinc-500 font-mono mt-1 truncate max-w-xs">{item.code.substring(0, 50)}...</p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={(e) => handlePinSnippet(item.id, e)} 
+                        <button
+                          onClick={(e) => handlePinSnippet(item.id, e)}
                           className={`p-1.5 hover:bg-white/5 rounded-lg transition-colors ${item.pinned ? 'text-amber-400' : 'text-zinc-500'}`}
                           title="Pin snippet"
                         >
                           <Pin className="w-3.5 h-3.5 fill-current" />
                         </button>
-                        <button 
-                          onClick={(e) => handleDeleteSnippet(item.id, e)} 
+                        <button
+                          onClick={(e) => handleDeleteSnippet(item.id, e)}
                           className="p-1.5 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 rounded-lg transition-colors"
                           title="Delete entry"
                         >
@@ -733,8 +728,8 @@ const CodingPlayground = () => {
               </div>
             </div>
             <div className="pt-4 border-t border-zinc-900 shrink-0">
-              <button 
-                onClick={() => { if(confirm('Clear all execution logs?')) { setHistoryList([]); localStorage.removeItem('21stc_playground_history'); } }}
+              <button
+                onClick={() => { if (confirm('Clear all execution logs?')) { setHistoryList([]); localStorage.removeItem('21stc_playground_history'); } }}
                 className="w-full py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
               >
                 Clear History

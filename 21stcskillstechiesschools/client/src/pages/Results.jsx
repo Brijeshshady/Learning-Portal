@@ -88,12 +88,24 @@ const Results = () => {
             <h2 className="text-2xl font-black text-white mt-4">{exam?.title || 'Exam Performance'}</h2>
             <p className="text-zinc-400 text-sm mt-1">{exam?.subject} Assessment Report</p>
             
-            {attempt?.securityFlags?.tabSwitches > 0 && (
-              <div className="flex items-center gap-2 mt-4 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-xl w-fit">
-                <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-red-400">
-                  {attempt.securityFlags.tabSwitches} Proctoring Flags Triggered
-                </span>
+            {(attempt?.securityFlags?.tabSwitches > 0 || attempt?.securityFlags?.fullscreenExits > 0) && (
+              <div className="flex flex-wrap items-center gap-2 mt-4">
+                {attempt.securityFlags.tabSwitches > 0 && (
+                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-xl w-fit">
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-red-400">
+                      {attempt.securityFlags.tabSwitches} window switches
+                    </span>
+                  </div>
+                )}
+                {attempt.securityFlags.fullscreenExits > 0 && (
+                  <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl w-fit">
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                      {attempt.securityFlags.fullscreenExits} fullscreen exits
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

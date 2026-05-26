@@ -12,6 +12,8 @@ const ExamAttempt = ({ user }) => {
   const [flagged, setFlagged] = useState({}); // { questionId: boolean } for review later
   const [timeLeft, setTimeLeft] = useState(0); // in seconds
   const [tabSwitches, setTabSwitches] = useState(0);
+  const [fullscreenExits, setFullscreenExits] = useState(0);
+  const [isFullscreenLocked, setIsFullscreenLocked] = useState(true);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -26,6 +28,9 @@ const ExamAttempt = ({ user }) => {
   const tabSwitchesRef = useRef(tabSwitches);
   tabSwitchesRef.current = tabSwitches;
 
+  const fullscreenExitsRef = useRef(fullscreenExits);
+  fullscreenExitsRef.current = fullscreenExits;
+
   useEffect(() => {
     const loadAttemptData = async () => {
       try {
@@ -37,6 +42,8 @@ const ExamAttempt = ({ user }) => {
           setAttempt(data.attempt);
           setQuestions(data.questions || []);
           setTabSwitches(data.attempt.securityFlags?.tabSwitches || 0);
+          setFullscreenExits(data.attempt.securityFlags?.fullscreenExits || 0);
+          setIsFullscreenLocked(!document.fullscreenElement);
           
           // Map existing answers
           const answerMap = {};
@@ -79,7 +86,7 @@ const ExamAttempt = ({ user }) => {
     return () => clearInterval(interval);
   }, [loading, timeLeft, submitting]);
 
-  // Proctoring: detect tab changes
+  // Proctoring: detect tab changes & fullscreen exits
   useEffect(() => {
     if (loading || submitting) return;
     
@@ -89,14 +96,40 @@ const ExamAttempt = ({ user }) => {
           const updated = prev + 1;
           setShowWarningModal(true);
           // Auto save immediately on tab switch to log violation
-          saveProgress(answersRef.current, updated);
+          saveProgress(answersRef.current, updated, fullscreenExitsRef.current);
           return updated;
         });
       }
     };
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreenLocked(true);
+        setFullscreenExits(prev => {
+          const updated = prev + 1;
+          setShowWarningModal(true);
+          // Auto save immediately on fullscreen exit to log violation
+          saveProgress(answersRef.current, tabSwitchesRef.current, updated);
+          return updated;
+        });
+      } else {
+        setIsFullscreenLocked(false);
+      }
+    };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
   }, [loading, submitting]);
 
   // Auto-save every 10 seconds
@@ -104,13 +137,13 @@ const ExamAttempt = ({ user }) => {
     if (loading || submitting) return;
     
     autoSaveTimerRef.current = setInterval(() => {
-      saveProgress(answersRef.current, tabSwitchesRef.current);
+      saveProgress(answersRef.current, tabSwitchesRef.current, fullscreenExitsRef.current);
     }, 10000);
     
     return () => clearInterval(autoSaveTimerRef.current);
   }, [loading, submitting]);
 
-  const saveProgress = async (currentAnswers, currentFlags) => {
+  const saveProgress = async (currentAnswers, currentFlags, currentExits) => {
     if (!attempt) return;
     setSaving(true);
     try {
@@ -120,7 +153,7 @@ const ExamAttempt = ({ user }) => {
       }));
       await DB.saveExamProgress(attempt.id, formattedAnswers, {
         tabSwitches: currentFlags,
-        fullscreenExits: attempt.securityFlags?.fullscreenExits || 0
+        fullscreenExits: currentExits
       });
     } catch (err) {
       console.warn("Auto save failed temporarily:", err);
@@ -192,6 +225,18 @@ const ExamAttempt = ({ user }) => {
     params.delete('examId');
     window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  const handleEnterFullscreen = () => {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) {
+      elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) {
+      elem.msRequestFullscreen();
+    }
+    setIsFullscreenLocked(false);
   };
 
   if (loading) {
@@ -431,12 +476,24 @@ const ExamAttempt = ({ user }) => {
             </div>
           </div>
 
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 mt-8">
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tab switches</p>
-                <p className="text-sm font-black text-red-400">{tabSwitches} / 3 Allowed</p>
+          <div className="space-y-3 mt-8">
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tab switches</p>
+                  <p className="text-sm font-black text-red-400">{tabSwitches} / 3 Allowed</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Fullscreen Exits</p>
+                  <p className="text-sm font-black text-amber-400">{fullscreenExits} Detected</p>
+                </div>
               </div>
             </div>
           </div>
@@ -461,9 +518,15 @@ const ExamAttempt = ({ user }) => {
               <p className="text-zinc-400 text-sm mt-3 leading-relaxed">
                 Tab switching or window unfocusing is strictly monitored. This action has been logged in the system.
               </p>
-              <div className="bg-zinc-800 border border-zinc-800 rounded-2xl p-4 mt-6">
-                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Violation logged</p>
-                <p className="text-base font-black text-white mt-1">Tab switches: {tabSwitches}</p>
+              <div className="bg-zinc-800 border border-zinc-800 rounded-2xl p-4 mt-6 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Tab switches</p>
+                  <p className="text-base font-black text-white mt-1">{tabSwitches}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Fullscreen Exits</p>
+                  <p className="text-base font-black text-white mt-1">{fullscreenExits}</p>
+                </div>
               </div>
               <button
                 onClick={() => setShowWarningModal(false)}
@@ -473,6 +536,53 @@ const ExamAttempt = ({ user }) => {
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Fullscreen Security Lock Overlay */}
+      <AnimatePresence>
+        {isFullscreenLocked && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-6 text-center select-none"
+          >
+            <div className="absolute top-12 left-1/4 w-80 h-80 rounded-full bg-red-500/5 blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-12 right-1/4 w-80 h-80 rounded-full bg-secondary/5 blur-[120px] pointer-events-none" />
+
+            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-[3rem] p-10 max-w-lg w-full backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-red-500/10 blur-3xl rounded-full -mr-24 -mt-24"></div>
+
+              <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 relative">
+                <div className="absolute inset-0 bg-red-500/20 rounded-3xl animate-ping opacity-75 duration-1000"></div>
+                <ShieldAlert className="w-10 h-10 text-red-500 relative z-10" />
+              </div>
+
+              <h2 className="text-2xl font-black text-white">Exam Security Lock</h2>
+              <p className="text-zinc-400 text-sm mt-4 leading-relaxed font-semibold">
+                To maintain assessment integrity and prevent external distractions, this examination requires active **Fullscreen Mode**.
+              </p>
+              
+              <div className="bg-zinc-950/60 border border-zinc-900 rounded-2xl p-5 mt-6 text-left space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                  <p className="text-zinc-400 text-xs font-bold">Leaving fullscreen is logged as a proctor violation.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                  <p className="text-zinc-400 text-xs font-bold">Clipboard copying and right-click actions are disabled.</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleEnterFullscreen}
+                className="mt-8 w-full bg-secondary hover:bg-secondary/90 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-lg shadow-secondary/20 flex items-center justify-center gap-2"
+              >
+                Enable Fullscreen & Begin
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

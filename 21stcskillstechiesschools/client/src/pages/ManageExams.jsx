@@ -261,12 +261,24 @@ const ManageExams = () => {
                         )}
                       </div>
 
-                      {att.securityFlags?.tabSwitches > 0 && (
-                        <div className="flex items-center gap-1.5 text-red-400">
-                          <ShieldAlert className="w-3.5 h-3.5" />
-                          <span className="text-[9px] font-bold">
-                            {att.securityFlags.tabSwitches} window switches flagged
-                          </span>
+                      {(att.securityFlags?.tabSwitches > 0 || att.securityFlags?.fullscreenExits > 0) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {att.securityFlags?.tabSwitches > 0 && (
+                            <div className="flex items-center gap-1.5 text-red-400">
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              <span className="text-[9px] font-bold">
+                                {att.securityFlags.tabSwitches} window switches flagged
+                              </span>
+                            </div>
+                          )}
+                          {att.securityFlags?.fullscreenExits > 0 && (
+                            <div className="flex items-center gap-1.5 text-amber-400">
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              <span className="text-[9px] font-bold">
+                                {att.securityFlags.fullscreenExits} fullscreen exits
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
 
