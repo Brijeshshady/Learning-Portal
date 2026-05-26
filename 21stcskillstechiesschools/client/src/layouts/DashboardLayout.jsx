@@ -110,7 +110,7 @@ const DashboardLayout = () => {
   if (isGlobalMaintenance || isHubInMaintenance) {
     const message = isHubInMaintenance 
       ? (userHub.maintenance.message || "This institutional hub is currently undergoing scheduled maintenance.")
-      : "The 21st Century Learning Portal is currently undergoing global system maintenance.";
+      : "The 21stc Portal is currently undergoing global system maintenance.";
     
     const until = isHubInMaintenance ? userHub.maintenance.until : null;
 

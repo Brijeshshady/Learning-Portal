@@ -7,10 +7,10 @@ const Footer = () => (
     <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-16">
       <div className="col-span-1 md:col-span-2">
         <Link to="/" className="flex items-center gap-3 no-underline mb-8">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center p-2.5">
-            <School className="text-white w-5 h-5" />
+          <div className="w-10 h-10 flex items-center justify-center">
+            <img src="/logo.webp" alt="21stc Techies Schools" className="w-full h-full object-contain" />
           </div>
-          <span className="text-2xl font-bold text-white font-headline">21stc Skills</span>
+          <span className="text-2xl font-bold text-white font-headline">21stc Techies Schools</span>
         </Link>
         <p className="text-zinc-400 text-lg max-w-sm mb-8 leading-relaxed">
           Empowering schools with the next generation of technology and science curriculum. Built for innovators, by innovators.
@@ -36,7 +36,7 @@ const Footer = () => (
       </div>
     </div>
     <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-      <p className="text-zinc-600 text-sm">© 2024 21stc Skills Techies Schools. Powered by Green Dwarf Tech</p>
+      <p className="text-zinc-600 text-sm">© 2024 21stc Techies Schools. Powered by Green Dwarf Tech</p>
     </div>
   </footer>
 );

@@ -93,7 +93,7 @@ const StaticPage = ({ title, children }) => (
 );
 
 const AboutPage = () => (
-  <StaticPage title="About 21st Century Skills">
+  <StaticPage title="About 21stc Techies Schools">
     <p>We are dedicated to equipping students with the tools they need for the future. Through our AI Innovation Labs, we bring hands-on AI, Machine Learning, and Robotics education directly to school campuses.</p>
     <p>Our mission is to bridge the gap between traditional education and the rapidly evolving tech landscape, empowering the next generation of innovators and thinkers.</p>
   </StaticPage>

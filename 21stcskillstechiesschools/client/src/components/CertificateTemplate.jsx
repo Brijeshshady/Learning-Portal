@@ -33,7 +33,7 @@ const CertificateTemplate = forwardRef(({ cert }, ref) => {
             </svg>
           </div>
         </div>
-        <h1 className="text-[12px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-2">21st Century Skills</h1>
+        <h1 className="text-[12px] font-black uppercase tracking-[0.4em] text-emerald-500 mb-2">21stc Techies Schools</h1>
         <h2 className="text-5xl font-black tracking-tighter text-white uppercase">Certificate of Completion</h2>
       </div>
 

@@ -194,12 +194,12 @@ const Sidebar = () => {
       {/* ── Branding ─────────────────────────────────────────────────────── */}
       <div className="px-5 py-5 border-b border-outline-variant flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 ${accent.bg} rounded-xl flex items-center justify-center shadow-lg ${accent.shadow} shrink-0`}>
-            <LayoutDashboard className="text-white w-4 h-4" />
+          <div className="w-9 h-9 flex items-center justify-center shrink-0">
+            <img src="/logo.webp" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <p className="font-black text-[15px] font-headline tracking-tight text-white leading-none">
-              21stc <span className={accent.text}>{label}</span>
+              21stc <span className={accent.text}>Portal</span>
             </p>
             <p className={`text-[9px] font-black uppercase tracking-[0.25em] ${accent.text} opacity-70 mt-0.5`}>
               {role.replace('-', ' ')}

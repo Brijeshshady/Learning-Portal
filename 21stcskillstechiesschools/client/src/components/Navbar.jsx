@@ -6,10 +6,10 @@ const Navbar = () => (
   <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b border-white/5 py-4">
     <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
       <Link to="/" className="flex items-center gap-3 no-underline group">
-        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center p-2.5 shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
-          <School className="text-white w-5 h-5" />
+        <div className="w-10 h-10 flex items-center justify-center group-hover:scale-105 transition-transform">
+          <img src="/logo.webp" alt="21stc Techies Schools" className="w-full h-full object-contain" />
         </div>
-        <span className="text-xl font-bold tracking-tight text-white font-headline">21stc Skills</span>
+        <span className="text-xl font-bold tracking-tight text-white font-headline">21stc Techies Schools</span>
       </Link>
       
       <nav className="hidden lg:flex gap-8">

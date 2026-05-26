@@ -62,10 +62,10 @@ const Login = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 via-transparent to-primary/20 pointer-events-none"></div>
           <div className="relative z-10 space-y-10">
             <Link to="/" className="flex items-center gap-3 group/logo">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-3 shrink-0 shadow-xl transition-transform group-hover/logo:scale-110">
-                <LayoutGrid className="text-primary w-full h-full" />
+              <div className="w-12 h-12 flex items-center justify-center shrink-0 transition-transform group-hover/logo:scale-110">
+                <img src="/logo.webp" alt="Logo" className="w-full h-full object-contain" />
               </div>
-              <span className="text-2xl font-black font-headline text-white tracking-tight">21stc Skills</span>
+              <span className="text-2xl font-black font-headline text-white tracking-tight">21stc Techies Schools</span>
             </Link>
 
             <div className="space-y-4">
@@ -91,7 +91,7 @@ const Login = () => {
           <div className="max-w-md w-full mx-auto space-y-10">
             <div>
               <h2 className="text-4xl font-black font-headline text-white tracking-tight">Welcome Back</h2>
-              <p className="text-zinc-500 mt-2 font-medium">Sign in to your 21stc learning portal</p>
+              <p className="text-zinc-500 mt-2 font-medium">Sign in to your 21stc Portal</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-6">

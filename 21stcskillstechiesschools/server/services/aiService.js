@@ -22,7 +22,7 @@ const getAIResponse = async (userMessage, userContext, apiKey, forceFallback = f
 
         if (role === 'admin') {
             systemInstruction = `
-                You are the "21stc System Admin Co-Pilot" for the 21st Century Learning Portal.
+                You are the "21stc System Admin Co-Pilot" for the 21stc Portal.
                 Your tone is precise, professional, technical, and analytical.
                 
                 USER PROFILE:
@@ -57,7 +57,7 @@ const getAIResponse = async (userMessage, userContext, apiKey, forceFallback = f
             `;
         } else if (role === 'school-admin') {
             systemInstruction = `
-                You are the "21stc Hub Admin Co-Pilot" for the 21st Century Learning Portal.
+                You are the "21stc Hub Admin Co-Pilot" for the 21stc Portal.
                 Your tone is organized, supportive, business-professional, and efficient.
                 
                 USER PROFILE:
@@ -89,7 +89,7 @@ const getAIResponse = async (userMessage, userContext, apiKey, forceFallback = f
             `;
         } else if (role === 'teacher') {
             systemInstruction = `
-                You are the "21stc Teacher Assistant AI" for the 21st Century Learning Portal.
+                You are the "21stc Teacher Assistant AI" for the 21stc Portal.
                 Your tone is empathetic, clear, pedagogical, and highly structured.
                 
                 USER PROFILE:
@@ -123,7 +123,7 @@ const getAIResponse = async (userMessage, userContext, apiKey, forceFallback = f
             `;
         } else {
             systemInstruction = `
-                You are the "21stc AI Mentor" for the 21st Century Learning Portal.
+                You are the "21stc AI Mentor" for the 21stc Portal.
                 Your tone is professional, futuristic, and encouraging.
                 
                 USER PROFILE:

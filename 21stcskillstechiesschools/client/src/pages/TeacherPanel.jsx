@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle, X, Paperclip } from 'lucide-react';
+import { Users, ClipboardList, BookOpen, Search, Download, ChevronDown, FileText, Activity, Award, CheckCircle2, AlertTriangle, Lock, Calendar, CheckSquare, MapPin, Inbox, XCircle, Clock, ArrowRight, ThumbsUp, ThumbsDown, Filter, PlusCircle, X, Paperclip, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DB from '../lib/db';
 import {
@@ -81,6 +81,7 @@ const StudentsView = ({ students }) => {
   
   const store = useStore();
   const submissions = store.submissions || [];
+  const grades = store.grades || {};
   const attendance = store.attendance || [];
   const certificates = store.certificates || [];
   const allUsers = store.users || [];
@@ -333,7 +334,7 @@ const StudentsView = ({ students }) => {
                                     )}
                                   </td>
                                   <td className="px-6 py-4 text-xs font-mono font-black text-blue-400">
-                                    {sub.status === 'graded' ? 'Grade A' : '—'}
+                                    {sub.status === 'graded' ? `Grade ${grades[sub.id] || 'A'}` : '—'}
                                   </td>
                                 </tr>
                               ))}
