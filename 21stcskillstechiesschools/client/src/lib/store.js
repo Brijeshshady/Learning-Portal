@@ -12,44 +12,44 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; // km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
 /* ── Initial data ──────────────────────────────────────────────────────── */
 const initialUsers = [
-  { id: 'u0', name: 'Super Admin',   email: 'superadmin@21stc.com', password: 'password123', role: 'admin',        schoolId: null,         status: 'active' },
-  { id: 'u5', name: 'Hub Manager',   email: 'hubadmin@21stc.com',   password: 'password123', role: 'school-admin', schoolId: 'HUB-CH-01',  status: 'active' },
-  { id: 'u3', name: 'Ms. Kavitha',   email: 'teacher@21stc.com',    password: 'password123', role: 'teacher',      schoolId: 'HUB-CH-01',  status: 'active', grades: [6, 7, 8] },
-  { id: 'u1', name: 'Arun Kumar',    email: 'student@21stc.com',    password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active', grade: 7 },
-  { id: 'u2', name: 'Priya Selvi',   email: 'student2@21stc.com',   password: 'password123', role: 'student',      schoolId: 'HUB-CH-01',  status: 'active', grade: 8 },
+  { id: 'u0', name: 'Super Admin', email: 'superadmin@21stc.com', password: 'password123', role: 'admin', schoolId: null, status: 'active' },
+  { id: 'u5', name: 'Hub Manager', email: 'hubadmin@21stc.com', password: 'password123', role: 'school-admin', schoolId: 'HUB-CH-01', status: 'active' },
+  { id: 'u3', name: 'Ms. Kavitha', email: 'teacher@21stc.com', password: 'password123', role: 'teacher', schoolId: 'HUB-CH-01', status: 'active', grades: [6, 7, 8] },
+  { id: 'u1', name: 'Arun Kumar', email: 'student@21stc.com', password: 'password123', role: 'student', schoolId: 'HUB-CH-01', status: 'active', grade: 7 },
+  { id: 'u2', name: 'Priya Selvi', email: 'student2@21stc.com', password: 'password123', role: 'student', schoolId: 'HUB-CH-01', status: 'active', grade: 8 },
 ];
 
 const initialNotifications = [
-  { id: 'n1', title: 'Week 7 Unlocked',       body: 'Neural Logic module is now available.',  time: 'Just now',   read: false, type: 'info' },
-  { id: 'n2', title: 'Grade Received',         body: 'You received an A on Week 6 assignment.', time: '2h ago',   read: false, type: 'success' },
-  { id: 'n3', title: 'License Expiry',         body: 'LIC-MDU-2025-C1 expires in 30 days.',    time: '1 day ago', read: true,  type: 'warning' },
-  { id: 'n4', title: 'New Hub Registered',     body: 'HUB-MDU-03 added to the platform.',      time: '3 days ago',read: true,  type: 'info' },
+  { id: 'n1', title: 'Week 7 Unlocked', body: 'Neural Logic module is now available.', time: 'Just now', read: false, type: 'info' },
+  { id: 'n2', title: 'Grade Received', body: 'You received an A on Week 6 assignment.', time: '2h ago', read: false, type: 'success' },
+  { id: 'n3', title: 'License Expiry', body: 'LIC-MDU-2025-C1 expires in 30 days.', time: '1 day ago', read: true, type: 'warning' },
+  { id: 'n4', title: 'New Hub Registered', body: 'HUB-MDU-03 added to the platform.', time: '3 days ago', read: true, type: 'info' },
 ];
 
 const initialPosts = [
-  { id: 1, author: 'Ms. Kavitha',      role: 'teacher',       avatar: 'K', time: '10m ago',   likes: 24, comments: 8,  tag: 'Announcement', body: 'Week 7 Neural Logic module is now live! Complete the theory section before Friday. 🚀', liked: false, schoolId: 'HUB-CH-01' },
-  { id: 2, author: 'Arun Kumar',        role: 'student',       avatar: 'A', time: '1h ago',    likes: 11, comments: 5,  tag: 'Discussion',    body: 'Has anyone tried connecting NodeMCU to a custom API? I got CORS errors. #IoT', liked: false, schoolId: 'HUB-CH-01' },
-  { id: 3, author: 'Super Admin',       role: 'admin',         avatar: 'S', time: '3h ago',    likes: 47, comments: 12, tag: 'Platform',      body: 'New: the 36-week roadmap now shows your predicted completion date. Check your dashboard! 🎯', liked: false, schoolId: null },
-  { id: 4, author: 'Priya Selvi',       role: 'student',       avatar: 'P', time: 'Yesterday', likes: 9,  comments: 3,  tag: 'Showcase',      body: 'Finished my Smart Room Controller — controls lights, fan, and door via voice! 🏆', liked: false, schoolId: 'HUB-CBE-02' },
-  { id: 5, author: 'Chennai Hub Admin', role: 'school-admin',  avatar: 'C', time: '2d ago',    likes: 31, comments: 7,  tag: 'Event',         body: 'Robotics Showcase is on May 25th! Grade 7 & 8 register by May 20. 🤖', liked: false, schoolId: 'HUB-CH-01' },
+  { id: 1, author: 'Ms. Kavitha', role: 'teacher', avatar: 'K', time: '10m ago', likes: 24, comments: 8, tag: 'Announcement', body: 'Week 7 Neural Logic module is now live! Complete the theory section before Friday. 🚀', liked: false, schoolId: 'HUB-CH-01' },
+  { id: 2, author: 'Arun Kumar', role: 'student', avatar: 'A', time: '1h ago', likes: 11, comments: 5, tag: 'Discussion', body: 'Has anyone tried connecting NodeMCU to a custom API? I got CORS errors. #IoT', liked: false, schoolId: 'HUB-CH-01' },
+  { id: 3, author: 'Super Admin', role: 'admin', avatar: 'S', time: '3h ago', likes: 47, comments: 12, tag: 'Platform', body: 'New: the 36-week roadmap now shows your predicted completion date. Check your dashboard! 🎯', liked: false, schoolId: null },
+  { id: 4, author: 'Priya Selvi', role: 'student', avatar: 'P', time: 'Yesterday', likes: 9, comments: 3, tag: 'Showcase', body: 'Finished my Smart Room Controller — controls lights, fan, and door via voice! 🏆', liked: false, schoolId: 'HUB-CBE-02' },
+  { id: 5, author: 'Chennai Hub Admin', role: 'school-admin', avatar: 'C', time: '2d ago', likes: 31, comments: 7, tag: 'Event', body: 'Robotics Showcase is on May 25th! Grade 7 & 8 register by May 20. 🤖', liked: false, schoolId: 'HUB-CH-01' },
 ];
 
 const initialHubs = [
-  { 
-    id: 'HUB-CH-01',  
-    name: 'Skillstech Central Tamil Nadu',  
-    studentLimit: 3000, 
-    location: 'Chennai',    
+  {
+    id: 'HUB-CH-01',
+    name: 'Skillstech Central Tamil Nadu',
+    studentLimit: 3000,
+    location: 'Chennai',
     completion: '78%',
     maintenance: { active: false, until: null, message: '' },
     featureLimits: {
@@ -64,11 +64,11 @@ const initialHubs = [
       sandboxTimeout: 5
     }
   },
-  { 
-    id: 'HUB-CBE-02', 
-    name: 'Coimbatore Innovation Lab',       
-    studentLimit: 1500, 
-    location: 'Coimbatore', 
+  {
+    id: 'HUB-CBE-02',
+    name: 'Coimbatore Innovation Lab',
+    studentLimit: 1500,
+    location: 'Coimbatore',
     completion: '82%',
     maintenance: { active: false, until: null, message: '' },
     featureLimits: {
@@ -126,14 +126,14 @@ const loadState = () => {
     certificates: initialCertificates,
     maintenanceMode: initialMaintenanceMode,
   };
-  
+
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       // Merge saved state with defaults so new keys (e.g. submissions) are always present
       const parsed = JSON.parse(saved);
       const merged = { ...defaultState, ...parsed };
-      
+
       // Force inject/update demo users to ensure they match the latest config
       initialUsers.forEach(demoUser => {
         const idx = merged.users.findIndex(u => u.email === demoUser.email);
@@ -147,7 +147,7 @@ const loadState = () => {
         if (idx !== -1) merged.hubs[idx] = { ...merged.hubs[idx], ...demoHub };
         else merged.hubs.unshift(demoHub);
       });
-      
+
       // Ensure new keys that didn't exist in old cache are always present
       if (!merged.submissions || !Array.isArray(merged.submissions)) {
         merged.submissions = initialSubmissions;
@@ -160,7 +160,7 @@ const loadState = () => {
         ...l,
         studentName: l.studentName || merged.users.find(u => u.id === l.studentId)?.name || 'Student'
       }));
-      
+
       return merged;
     }
   } catch (e) {
@@ -381,8 +381,8 @@ export const toggleLike = (postId) => {
 // ── Grades ──
 export const submitGrade = (submissionId, grade, feedback = '') => {
   const sub = state.submissions.find(s => s.id === submissionId);
-  state = { 
-    ...state, 
+  state = {
+    ...state,
     grades: { ...state.grades, [submissionId]: grade },
     submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'graded', feedback } : s)
   };
@@ -404,13 +404,13 @@ export const requestRevision = (submissionId, feedback = '') => {
   const sub = state.submissions.find(s => s.id === submissionId);
   const newGrades = { ...state.grades };
   delete newGrades[submissionId];
-  
+
   state = {
     ...state,
     grades: newGrades,
     submissions: state.submissions.map(s => s.id === submissionId ? { ...s, status: 'needs_revision', feedback } : s)
   };
-  
+
   // Notify the student directly
   if (sub?.studentId) {
     addNotification({
@@ -441,15 +441,15 @@ export const submitAssignment = (submission) => {
       attachment: submission.attachment || null,
       feedback: '' // clear feedback on resubmission
     };
-    
+
     const newGrades = { ...state.grades };
     delete newGrades[existing.id];
 
     const updatedSubmissions = [...state.submissions];
     updatedSubmissions[existingIndex] = newSub;
-    
-    state = { 
-      ...state, 
+
+    state = {
+      ...state,
       submissions: updatedSubmissions,
       grades: newGrades
     };
@@ -481,11 +481,11 @@ export const submitAssignment = (submission) => {
 
 // ── Hubs ──
 export const addHub = (hub) => {
-  const newHub = { 
-    ...hub, 
+  const newHub = {
+    ...hub,
     id: hub.id || `HUB-${Math.random().toString(36).substring(2, 5).toUpperCase()}`,
     completion: '0%',
-    status: 'active' 
+    status: 'active'
   };
   state = { ...state, hubs: [...state.hubs, newHub] };
   addNotification({ title: 'New Hub Registered', body: `${hub.name} has been added to the network.`, type: 'success' });
@@ -508,17 +508,17 @@ export const setHubMaintenance = (hubId, active, until = null, message = '') => 
   if (hub) {
     state = {
       ...state,
-      hubs: state.hubs.map(h => 
-        h.id === hubId 
-          ? { ...h, maintenance: { active, until, message } } 
+      hubs: state.hubs.map(h =>
+        h.id === hubId
+          ? { ...h, maintenance: { active, until, message } }
           : h
       )
     };
     notify();
-    addNotification({ 
-      title: active ? 'Hub Lockdown Activated' : 'Hub Lockdown Deactivated', 
-      body: active ? `${hub.name} is now locked down.` : `${hub.name} is back online.`, 
-      type: active ? 'warning' : 'success' 
+    addNotification({
+      title: active ? 'Hub Lockdown Activated' : 'Hub Lockdown Deactivated',
+      body: active ? `${hub.name} is now locked down.` : `${hub.name} is back online.`,
+      type: active ? 'warning' : 'success'
     });
   }
 };
@@ -526,19 +526,19 @@ export const setHubMaintenance = (hubId, active, until = null, message = '') => 
 /* ── Attendance tracking ────────────────────────────────────────────────── */
 export const markAttendance = (studentId, date, status, teacherId) => {
   const exists = state.attendance.find(a => a.studentId === studentId && a.date === date);
-  
+
   if (exists) {
     state = {
       ...state,
-      attendance: state.attendance.map(a => 
-        (a.studentId === studentId && a.date === date) 
-          ? { ...a, status, markedBy: teacherId } 
+      attendance: state.attendance.map(a =>
+        (a.studentId === studentId && a.date === date)
+          ? { ...a, status, markedBy: teacherId }
           : a
       )
     };
   } else {
     const newRecord = {
-      id: `att_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+      id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       studentId,
       date,
       status,
@@ -610,14 +610,14 @@ export const cancelLeave = (leaveId, studentId) => {
 // ── Teacher Attendance ──
 export const teacherCheckIn = (teacherId, mode = 'onsite', coords = null) => {
   const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const now = d.toLocaleTimeString();
-  
+
   // Geofencing for On-Site Mode
   if (mode === 'onsite') {
     const user = state.users.find(u => u.id === teacherId);
     const hub = HUB_REGISTRY[user?.schoolId];
-    
+
     if (hub?.coords && coords) {
       const distance = calculateDistance(coords.lat, coords.lng, hub.coords.lat, hub.coords.lng);
       if (distance > 0.5) { // > 500 meters
@@ -627,7 +627,7 @@ export const teacherCheckIn = (teacherId, mode = 'onsite', coords = null) => {
   }
 
   const exists = state.teacherAttendance.find(a => a.teacherId === teacherId && a.date === today);
-  
+
   if (!exists) {
     const record = {
       id: `tatt_${Date.now()}`,
@@ -647,9 +647,9 @@ export const teacherCheckIn = (teacherId, mode = 'onsite', coords = null) => {
 
 export const teacherCheckOut = (teacherId) => {
   const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const now = d.toLocaleTimeString();
-  
+
   const exists = state.teacherAttendance.find(a => a.teacherId === teacherId && a.date === today);
   if (!exists) {
     throw new Error('You have not checked in today.');
@@ -660,9 +660,9 @@ export const teacherCheckOut = (teacherId) => {
 
   state = {
     ...state,
-    teacherAttendance: state.teacherAttendance.map(a => 
-      (a.teacherId === teacherId && a.date === today) 
-        ? { ...a, checkOut: now } 
+    teacherAttendance: state.teacherAttendance.map(a =>
+      (a.teacherId === teacherId && a.date === today)
+        ? { ...a, checkOut: now }
         : a
     )
   };
@@ -706,8 +706,8 @@ export const exportCSV = (rows, filename = 'export.csv') => {
   const headers = Object.keys(rows[0]).join(',');
   const body = rows.map((r) => Object.values(r).map((v) => `"${v ?? ''}"`).join(',')).join('\n');
   const blob = new Blob([`${headers}\n${body}`], { type: 'text/csv' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 };
